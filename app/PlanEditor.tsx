@@ -1,0 +1,180 @@
+"use client";
+
+/** Timeline editor for an EditPlan: edit per-scene copy/duration/motion, reorder. */
+
+const MOTIONS = [
+  "none",
+  "zoom_punch",
+  "circle_highlight",
+  "arrow_highlight",
+  "text_popup",
+  "before_after_split",
+  "number_countup",
+  "ending_cta_card",
+] as const;
+
+// Loose local types (mirror src/schema); avoids importing server code client-side.
+export interface UIScene {
+  start: number;
+  end: number;
+  source_clip: string;
+  source_in?: number;
+  speed: number;
+  narration: string;
+  subtitle: string;
+  subtitle_emphasis: string;
+  motion: { type: string; params: Record<string, unknown> };
+  sfx: { at: number; type: string }[];
+}
+export interface UIPlan {
+  format: { ratio: string; duration_sec: number; fps: number };
+  timeline: UIScene[];
+  cta: { text: string; start: number };
+  // passthrough fields kept as-is
+  [k: string]: unknown;
+}
+
+/** Re-derive absolute start/end from per-scene durations so timing stays valid. */
+function retime(plan: UIPlan): UIPlan {
+  let t = 0;
+  const timeline = plan.timeline.map((s) => {
+    const dur = Math.max(1, (s.end ?? 0) - (s.start ?? 0)) || 3;
+    const start = Math.round(t * 100) / 100;
+    const end = Math.round((t + dur) * 100) / 100;
+    t = end;
+    return { ...s, start, end };
+  });
+  const total = timeline.length ? timeline[timeline.length - 1].end : 0;
+  const cta = { ...plan.cta, start: timeline.length ? timeline[timeline.length - 1].start : 0 };
+  return { ...plan, timeline, cta, format: { ...plan.format, duration_sec: total } };
+}
+
+export default function PlanEditor({
+  plan,
+  onChange,
+}: {
+  plan: UIPlan;
+  onChange: (p: UIPlan) => void;
+}) {
+  const scenes = plan.timeline;
+
+  function updateScene(i: number, patch: Partial<UIScene>) {
+    const next = scenes.map((s, idx) => (idx === i ? { ...s, ...patch } : s));
+    onChange(retime({ ...plan, timeline: next }));
+  }
+  function setDuration(i: number, dur: number) {
+    const s = scenes[i];
+    updateScene(i, { end: s.start + Math.max(1, dur) });
+  }
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= scenes.length) return;
+    const next = [...scenes];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(retime({ ...plan, timeline: next }));
+  }
+  function remove(i: number) {
+    if (scenes.length <= 1) return;
+    onChange(retime({ ...plan, timeline: scenes.filter((_, idx) => idx !== i) }));
+  }
+
+  const total = plan.format.duration_sec;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-white/50">
+          Edit plan — {scenes.length} scenes · {total.toFixed(1)}s
+        </h3>
+      </div>
+
+      {scenes.map((s, i) => (
+        <div key={i} className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-2 text-xs font-medium text-white/50">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-accent/30 text-white">
+                {i + 1}
+              </span>
+              {i === 0 ? "Hook" : i === scenes.length - 1 ? "CTA" : `Scene ${i + 1}`} ·{" "}
+              {(s.end - s.start).toFixed(1)}s
+            </span>
+            <div className="flex items-center gap-1">
+              <IconBtn label="Up" disabled={i === 0} onClick={() => move(i, -1)}>↑</IconBtn>
+              <IconBtn label="Down" disabled={i === scenes.length - 1} onClick={() => move(i, 1)}>↓</IconBtn>
+              <IconBtn label="Delete" disabled={scenes.length <= 1} onClick={() => remove(i)}>✕</IconBtn>
+            </div>
+          </div>
+
+          <input
+            value={s.subtitle}
+            onChange={(e) => updateScene(i, { subtitle: e.target.value })}
+            placeholder="On-screen caption"
+            className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm font-medium outline-none focus:border-accent"
+          />
+          <div className="mb-2 flex gap-2">
+            <input
+              value={s.subtitle_emphasis}
+              onChange={(e) => updateScene(i, { subtitle_emphasis: e.target.value })}
+              placeholder="Emphasis word"
+              className="w-1/2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70 outline-none focus:border-accent"
+            />
+            <select
+              value={s.motion.type}
+              onChange={(e) => updateScene(i, { motion: { ...s.motion, type: e.target.value } })}
+              className="w-1/2 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-xs text-white/70 outline-none focus:border-accent"
+            >
+              {MOTIONS.map((m) => (
+                <option key={m} value={m} className="bg-[#1a1024]">
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <input
+            value={s.narration}
+            onChange={(e) => updateScene(i, { narration: e.target.value })}
+            placeholder="Narration (spoken) — optional"
+            className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/60 outline-none focus:border-accent"
+          />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/40">Duration</span>
+            <input
+              type="range"
+              min={1}
+              max={8}
+              step={0.5}
+              value={s.end - s.start}
+              onChange={(e) => setDuration(i, Number(e.target.value))}
+              className="flex-1 accent-accent"
+            />
+            <span className="w-10 text-right text-xs text-white/60">{(s.end - s.start).toFixed(1)}s</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function IconBtn({
+  children,
+  onClick,
+  disabled,
+  label,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="grid h-7 w-7 place-items-center rounded-md border border-white/10 text-xs text-white/70 hover:bg-white/10 disabled:opacity-25"
+    >
+      {children}
+    </button>
+  );
+}

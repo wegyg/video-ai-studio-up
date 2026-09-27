@@ -39,43 +39,66 @@ export interface PipelineResult {
   validation: ValidationResult;
 }
 
-export async function runPipeline(input: PipelineInput, deps: PipelineDeps = {}): Promise<PipelineResult> {
+/** Stage 1: ingest footage + generate + validate a plan (no rendering). */
+export async function generatePlan(
+  input: PipelineInput,
+  deps: PipelineDeps = {},
+): Promise<{ plan: EditPlan; clips: SourceClipInfo[]; validation: ValidationResult }> {
   const stt = deps.stt ?? freeSTT;
-  const planner = deps.planner ?? selectPlanProvider(); // LLM if key set, else template
-  const tts = deps.tts ?? selectTTSProvider(); // spoken if TTS key set, else silent
+  const planner = deps.planner ?? selectPlanProvider();
   const log = deps.onProgress ?? (() => {});
   const ratio: AspectRatio = input.ratio ?? "9:16";
   const fps = input.fps ?? 30;
   const durationSec = input.durationSec ?? 20;
-  const outPath = input.outPath ?? path.resolve("out/output.mp4");
 
-  // 1) Ingest: probe each uploaded clip. ------------------------------------
   log("ingest", `${input.clipPaths.length} clip(s)`);
   const clips: SourceClipInfo[] = [];
   for (let i = 0; i < input.clipPaths.length; i++) {
-    const p = input.clipPaths[i];
-    const meta = await probeClip(p);
-    clips.push({ id: `clip_${i}`, path: p, ...meta });
+    const meta = await probeClip(input.clipPaths[i]);
+    clips.push({ id: `clip_${i}`, path: input.clipPaths[i], ...meta });
   }
 
-  // 2) Transcribe (free = no-op). -------------------------------------------
   log("transcribe", stt.name);
   const transcripts: Transcript[] = [];
   for (const c of clips) transcripts.push(await stt.transcribe(c));
 
-  // 3) Generate the edit plan. ----------------------------------------------
   log("plan", planner.name);
   let plan = await planner.generate({ brief: input.brief, clips, transcripts, ratio, durationSec, fps });
 
-  // 4) Validate + auto-fix. --------------------------------------------------
   log("validate");
   const validation = validatePlan(plan);
-  plan = validation.plan; // apply auto-fixes
-  if (!validation.ok) {
-    // Errors remain (e.g. pace). Surface them; caller decides. We still render
-    // so the user can see the result, but flag it.
-    log("validate", "issues:\n" + formatIssues(validation.issues));
-  }
+  plan = validation.plan;
+  if (!validation.ok) log("validate", "issues:\n" + formatIssues(validation.issues));
+
+  return { plan, clips, validation };
+}
+
+export async function runPipeline(input: PipelineInput, deps: PipelineDeps = {}): Promise<PipelineResult> {
+  const tts = deps.tts ?? selectTTSProvider(); // spoken if TTS key set, else silent
+  const log = deps.onProgress ?? (() => {});
+  const outPath = input.outPath ?? path.resolve("out/output.mp4");
+
+  const { plan, clips, validation } = await generatePlan(input, deps);
+
+  return renderPlan(plan, clips, { tts, log, outPath, validation });
+}
+
+/** Stage 2: render a (possibly edited) plan + already-ingested clips to MP4. */
+export async function renderPlan(
+  plan: EditPlan,
+  clips: SourceClipInfo[],
+  opts: {
+    tts?: import("./providers/types").TTSProvider;
+    log?: (stage: string, detail?: string) => void;
+    outPath: string;
+    validation?: ValidationResult;
+  },
+): Promise<PipelineResult> {
+  const tts = opts.tts ?? selectTTSProvider();
+  const log = opts.log ?? (() => {});
+  const outPath = opts.outPath;
+  const validation = opts.validation ?? validatePlan(plan);
+  plan = validation.plan;
 
   // 5) Narration synthesis (silent-timed fallback by default). --------------
   log("tts", tts.name);

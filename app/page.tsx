@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import PlanEditor, { type UIPlan } from "./PlanEditor";
 
 type Ratio = "9:16" | "1:1" | "16:9";
 type JobStatus =
@@ -46,6 +47,8 @@ export default function Home() {
   const [dragOver, setDragOver] = useState(false);
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
+  const [plan, setPlan] = useState<UIPlan | null>(null); // editable draft
+  const [planId, setPlanId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const addFiles = useCallback((incoming: FileList | File[]) => {
@@ -72,28 +75,77 @@ export default function Home() {
     };
   }, [job?.id, job?.status]);
 
+  function briefForm() {
+    const fd = new FormData();
+    fd.append("brief", brief);
+    fd.append("ratio", ratio);
+    fd.append("duration", String(duration));
+    clips.forEach((f) => fd.append("videos", f));
+    return fd;
+  }
+
+  function startJob(id: string) {
+    setJob({
+      id,
+      status: "queued",
+      progress: 0,
+      message: "Queued",
+      error: null,
+      planSummary: null,
+      videoUrl: null,
+    });
+  }
+
+  // One-shot: generate + render immediately.
   async function handleGenerate() {
     if (!brief.trim()) return;
     setBusy(true);
     setJob(null);
+    setPlan(null);
     try {
-      const fd = new FormData();
-      fd.append("brief", brief);
-      fd.append("ratio", ratio);
-      fd.append("duration", String(duration));
-      clips.forEach((f) => fd.append("videos", f));
-      const r = await fetch("/api/generate", { method: "POST", body: fd });
+      const r = await fetch("/api/generate", { method: "POST", body: briefForm() });
       if (!r.ok) throw new Error((await r.json()).error || "Failed to start");
-      const { id } = await r.json();
-      setJob({
-        id,
-        status: "queued",
-        progress: 0,
-        message: "Queued",
-        error: null,
-        planSummary: null,
-        videoUrl: null,
+      startJob((await r.json()).id);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Two-step: get an editable plan first.
+  async function handleReviewEdit() {
+    if (!brief.trim()) return;
+    setBusy(true);
+    setJob(null);
+    setPlan(null);
+    try {
+      const r = await fetch("/api/plan", { method: "POST", body: briefForm() });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Plan failed");
+      setPlan(data.plan as UIPlan);
+      setPlanId(data.planId as string);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Render the (edited) plan.
+  async function handleRenderPlan() {
+    if (!plan) return;
+    setBusy(true);
+    setJob(null);
+    try {
+      const r = await fetch("/api/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId, plan }),
       });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Render failed");
+      startJob(data.id);
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -218,13 +270,45 @@ export default function Home() {
             />
           </label>
 
-          <button
-            onClick={handleGenerate}
-            disabled={busy || !brief.trim() || running}
-            className="w-full rounded-xl bg-accent py-3 font-semibold transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {busy ? "Starting…" : running ? "Working…" : "✨ Generate Short"}
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleReviewEdit}
+              disabled={busy || !brief.trim() || running}
+              className="rounded-xl bg-accent py-3 font-semibold transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-40"
+              title="Generate an editable plan you can tweak before rendering"
+            >
+              {busy && !job ? "Working…" : "📝 Review & Edit"}
+            </button>
+            <button
+              onClick={handleGenerate}
+              disabled={busy || !brief.trim() || running}
+              className="rounded-xl border border-white/15 py-3 font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              title="Skip editing and render straight away"
+            >
+              ⚡ Quick Generate
+            </button>
+          </div>
+
+          {plan && (
+            <div className="mt-2 rounded-xl border border-accent/30 bg-accent/5 p-4">
+              <PlanEditor plan={plan} onChange={setPlan} />
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={handleRenderPlan}
+                  disabled={busy || running}
+                  className="flex-1 rounded-xl bg-accent py-2.5 font-semibold transition hover:bg-accent-dark disabled:opacity-40"
+                >
+                  {running ? "Rendering…" : "🎬 Render Video"}
+                </button>
+                <button
+                  onClick={() => setPlan(null)}
+                  className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-white/60 transition hover:bg-white/5"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ---- Right: preview / progress ---- */}
