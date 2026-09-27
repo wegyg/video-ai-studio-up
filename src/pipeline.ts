@@ -12,8 +12,10 @@ import type { AspectRatio, EditPlan } from "./schema";
 import { validatePlan, formatIssues, type ValidationResult } from "./validate";
 import { probeClip } from "./probe";
 import type { PlanProvider, STTProvider, TTSProvider, SourceClipInfo, Transcript } from "./providers/types";
-import { freeSTT, freeTTS } from "./providers/free";
+import { freeSTT } from "./providers/free";
 import { selectPlanProvider } from "./providers/llm";
+import { selectTTSProvider } from "./providers/tts";
+import { buildNarrationTrack, muxAudio } from "./audio";
 
 export interface PipelineInput {
   brief: string;
@@ -40,7 +42,7 @@ export interface PipelineResult {
 export async function runPipeline(input: PipelineInput, deps: PipelineDeps = {}): Promise<PipelineResult> {
   const stt = deps.stt ?? freeSTT;
   const planner = deps.planner ?? selectPlanProvider(); // LLM if key set, else template
-  const tts = deps.tts ?? freeTTS;
+  const tts = deps.tts ?? selectTTSProvider(); // spoken if TTS key set, else silent
   const log = deps.onProgress ?? (() => {});
   const ratio: AspectRatio = input.ratio ?? "9:16";
   const fps = input.fps ?? 30;
@@ -75,17 +77,23 @@ export async function runPipeline(input: PipelineInput, deps: PipelineDeps = {})
     log("validate", "issues:\n" + formatIssues(validation.issues));
   }
 
-  // 5) (Optional) narration synthesis — free = skipped. ---------------------
+  // 5) Narration synthesis (silent-timed fallback by default). --------------
   log("tts", tts.name);
-  // Narration audio wiring is a follow-up; free path renders captions+motion.
+  const totalSec = plan.format.duration_sec;
+  const audioDir = path.join(path.dirname(outPath), "_audio");
+  const narrationPath = await buildNarrationTrack(plan, tts, audioDir, totalSec);
 
-  // 6) Render. --------------------------------------------------------------
+  // 6) Music bed (procedural / optional local). -----------------------------
+  const musicPath = await resolveMusic(plan, audioDir, totalSec, log);
+
+  // 7) Render (video only -> silent temp), then mux audio. ------------------
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   const serveUrl = await bundle({ entryPoint: path.resolve("remotion/index.ts") });
+  const silentVideo = path.join(path.dirname(outPath), "_video_silent.mp4");
 
   if (clips.length === 0) {
     // No footage -> Remotion renders the full placeholder video directly.
-    log("render", `${outPath} (placeholder backgrounds)`);
+    log("render", `placeholder backgrounds`);
     const composition = await selectComposition({
       serveUrl,
       id: "Plan",
@@ -95,7 +103,7 @@ export async function runPipeline(input: PipelineInput, deps: PipelineDeps = {})
       composition,
       serveUrl,
       codec: "h264",
-      outputLocation: outPath,
+      outputLocation: silentVideo,
       inputProps: { plan, clipSrcMap: {}, mode: "full" },
       concurrency: 2,
     });
@@ -123,12 +131,37 @@ export async function runPipeline(input: PipelineInput, deps: PipelineDeps = {})
     });
 
     log("composite", "FFmpeg: user footage + overlay");
-    await compositeWithFootage(plan, clips, overlayPath, outPath);
+    await compositeWithFootage(plan, clips, overlayPath, silentVideo);
     try {
       fs.unlinkSync(overlayPath);
     } catch {
       /* ignore */
     }
+  }
+
+  // 8) Mux narration + music under the video. -------------------------------
+  const hasAudio = Boolean(narrationPath || musicPath);
+  if (hasAudio) {
+    log("composite", "FFmpeg: mixing narration + music");
+    await muxAudio(silentVideo, outPath, {
+      narrationPath,
+      musicPath,
+      duckDb: plan.music.duck_db,
+      totalSec,
+    });
+    try {
+      fs.unlinkSync(silentVideo);
+    } catch {
+      /* ignore */
+    }
+  } else {
+    // no audio -> the silent video IS the output
+    fs.renameSync(silentVideo, outPath);
+  }
+  try {
+    fs.rmSync(audioDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
   }
 
   log("done", outPath);
@@ -201,4 +234,19 @@ async function compositeWithFootage(
   } catch {
     /* ignore */
   }
+}
+
+
+/**
+ * Resolve a background music track for the plan. Implemented in feature #3
+ * (procedural FFmpeg bed + optional local track). Placeholder returns null
+ * (no music) until then.
+ */
+async function resolveMusic(
+  _plan: EditPlan,
+  _workDir: string,
+  _totalSec: number,
+  _log: (stage: string, detail?: string) => void,
+): Promise<string | null> {
+  return null;
 }
