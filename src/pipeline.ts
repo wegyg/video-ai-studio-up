@@ -23,6 +23,7 @@ export interface PipelineInput {
   ratio?: AspectRatio;
   durationSec?: number;
   fps?: number;
+  captionStyle?: import("./schema").CaptionStyle;
   outPath?: string;
 }
 
@@ -65,6 +66,7 @@ export async function generatePlan(
 
   log("plan", planner.name);
   let plan = await planner.generate({ brief: input.brief, clips, transcripts, ratio, durationSec, fps });
+  if (input.captionStyle) plan.format.caption_style = input.captionStyle;
 
   log("validate");
   const validation = validatePlan(plan);

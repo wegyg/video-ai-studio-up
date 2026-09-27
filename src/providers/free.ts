@@ -127,7 +127,7 @@ export const freePlanProvider: PlanProvider = {
           : "소스 영상 미제공 → 플레이스홀더 배경 사용",
         `${ratio} ${total}s, 무료 템플릿 디렉터(외부 API 미사용)`,
       ],
-      format: { ratio, duration_sec: total, fps },
+      format: { ratio, duration_sec: total, fps, caption_style: "bold-pop" },
       cut_ranges: [],
       timeline,
       music: {

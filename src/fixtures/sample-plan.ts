@@ -9,7 +9,7 @@ export const samplePlan: EditPlan = {
     "No source footage provided -> scenes use colored placeholder backgrounds",
     "9:16 vertical, 20s, royalty-free/AI music only",
   ],
-  format: { ratio: "9:16", duration_sec: 20, fps: 30 },
+  format: { ratio: "9:16", duration_sec: 20, fps: 30, caption_style: "bold-pop" },
   cut_ranges: [],
   timeline: [
     {

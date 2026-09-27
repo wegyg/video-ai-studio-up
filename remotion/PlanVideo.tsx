@@ -45,7 +45,12 @@ export const PlanVideo: React.FC<{
               />
             )}
             <MotionOverlay motion={scene.motion} accent={ACCENT} />
-            <Subtitle text={scene.subtitle} emphasis={scene.subtitle_emphasis} accent={ACCENT} />
+            <Subtitle
+              text={scene.subtitle}
+              emphasis={scene.subtitle_emphasis}
+              accent={ACCENT}
+              style={plan.format.caption_style}
+            />
           </Sequence>
         );
       })}

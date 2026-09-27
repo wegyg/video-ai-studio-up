@@ -4,6 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PlanEditor, { type UIPlan } from "./PlanEditor";
 
 type Ratio = "9:16" | "1:1" | "16:9";
+type CaptionStyle = "bold-pop" | "karaoke-bar" | "minimal" | "boxed";
+const CAPTION_STYLES: { value: CaptionStyle; label: string }[] = [
+  { value: "bold-pop", label: "Bold Pop" },
+  { value: "karaoke-bar", label: "Karaoke" },
+  { value: "minimal", label: "Minimal" },
+  { value: "boxed", label: "Boxed" },
+];
 type JobStatus =
   | "queued"
   | "ingest"
@@ -44,6 +51,7 @@ export default function Home() {
   const [brief, setBrief] = useState("");
   const [ratio, setRatio] = useState<Ratio>("9:16");
   const [duration, setDuration] = useState(20);
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>("bold-pop");
   const [clips, setClips] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [job, setJob] = useState<Job | null>(null);
@@ -81,6 +89,7 @@ export default function Home() {
     fd.append("brief", brief);
     fd.append("ratio", ratio);
     fd.append("duration", String(duration));
+    fd.append("caption_style", captionStyle);
     clips.forEach((f) => fd.append("videos", f));
     return fd;
   }
@@ -252,6 +261,24 @@ export default function Home() {
                   }`}
                 >
                   {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* caption style */}
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-white/70">Caption style</span>
+            <div className="inline-flex flex-wrap gap-1 rounded-xl border border-white/10 bg-black/20 p-1">
+              {CAPTION_STYLES.map((c) => (
+                <button
+                  key={c.value}
+                  onClick={() => setCaptionStyle(c.value)}
+                  className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
+                    captionStyle === c.value ? "bg-accent text-white" : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  {c.label}
                 </button>
               ))}
             </div>

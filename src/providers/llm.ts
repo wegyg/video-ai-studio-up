@@ -152,7 +152,7 @@ function assemble(
         : "소스 영상 미제공 → 플레이스홀더 배경",
       `LLM 디렉터(${llmConfig().model}) 초안, 타이밍은 규칙 기반 재조정`,
     ],
-    format: { ratio, duration_sec: total, fps },
+    format: { ratio, duration_sec: total, fps, caption_style: "bold-pop" },
     cut_ranges: [],
     timeline: scenes,
     music: {

@@ -11,10 +11,20 @@ import { z } from "zod";
 export const AspectRatio = z.enum(["9:16", "1:1", "16:9"]);
 export type AspectRatio = z.infer<typeof AspectRatio>;
 
+// Caption look presets (rendered by remotion/components/Subtitle).
+export const CaptionStyle = z.enum([
+  "bold-pop", // words pop in one-by-one, chunky, per-word chips (default)
+  "karaoke-bar", // full line shown; a highlight bar sweeps word-by-word
+  "minimal", // clean thin text, no chips, subtle fade
+  "boxed", // one solid caption box, whole line, TV-lower-third feel
+]);
+export type CaptionStyle = z.infer<typeof CaptionStyle>;
+
 export const Format = z.object({
   ratio: AspectRatio.default("9:16"),
   duration_sec: z.number().positive().max(180).default(20),
   fps: z.number().int().positive().max(60).default(30),
+  caption_style: CaptionStyle.default("bold-pop"),
 });
 export type Format = z.infer<typeof Format>;
 

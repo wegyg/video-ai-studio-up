@@ -4,7 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 
 import { runPipeline } from "@/pipeline";
-import type { AspectRatio } from "@/schema";
+import type { AspectRatio, CaptionStyle } from "@/schema";
 import { jobStore, jobDir } from "@/server/jobs";
 
 export const runtime = "nodejs";
@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
   const brief = String(form.get("brief") ?? "").trim();
   const ratio = (String(form.get("ratio") ?? "9:16") as AspectRatio) || "9:16";
   const duration = Number(form.get("duration") ?? 20) || 20;
+  const captionStyle = form.get("caption_style")
+    ? (String(form.get("caption_style")) as CaptionStyle)
+    : undefined;
 
   if (!brief) {
     return NextResponse.json({ error: "A one-line brief is required" }, { status: 400 });
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   // Run the pipeline in the background; the client polls /api/jobs/:id.
   void runPipeline(
-    { brief, clipPaths, ratio, durationSec: duration, outPath },
+    { brief, clipPaths, ratio, durationSec: duration, captionStyle, outPath },
     { onProgress: (stage, detail) => jobStore.markStage(id, stage, detail) },
   )
     .then((res) => {
