@@ -12,7 +12,8 @@ import type { AspectRatio, EditPlan } from "./schema";
 import { validatePlan, formatIssues, type ValidationResult } from "./validate";
 import { probeClip } from "./probe";
 import type { PlanProvider, STTProvider, TTSProvider, SourceClipInfo, Transcript } from "./providers/types";
-import { freePlanProvider, freeSTT, freeTTS } from "./providers/free";
+import { freeSTT, freeTTS } from "./providers/free";
+import { selectPlanProvider } from "./providers/llm";
 
 export interface PipelineInput {
   brief: string;
@@ -38,7 +39,7 @@ export interface PipelineResult {
 
 export async function runPipeline(input: PipelineInput, deps: PipelineDeps = {}): Promise<PipelineResult> {
   const stt = deps.stt ?? freeSTT;
-  const planner = deps.planner ?? freePlanProvider;
+  const planner = deps.planner ?? selectPlanProvider(); // LLM if key set, else template
   const tts = deps.tts ?? freeTTS;
   const log = deps.onProgress ?? (() => {});
   const ratio: AspectRatio = input.ratio ?? "9:16";
