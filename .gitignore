@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+public/clips/
+tmp/
+*.log
+.DS_Store
+.env
+.env.local
+
+*.tsbuildinfo

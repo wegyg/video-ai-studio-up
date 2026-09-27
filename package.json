@@ -1,0 +1,32 @@
+{
+  "name": "shorts-director",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Video + one-line brief -> AI edit-plan JSON -> validated -> rendered vertical short (Remotion + FFmpeg)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "remotion:studio": "remotion studio remotion/index.ts",
+    "remotion:render": "remotion render remotion/index.ts",
+    "plan:sample": "tsx scripts/render-sample.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.290",
+    "@remotion/cli": "4.0.290",
+    "@remotion/renderer": "4.0.290",
+    "next": "14.2.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.290",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.0",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "tsx": "4.19.1",
+    "typescript": "5.5.4"
+  }
+}

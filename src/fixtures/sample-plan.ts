@@ -1,0 +1,108 @@
+/**
+ * A sample edit plan used to render a preview with NO external APIs.
+ * It exercises every motion preset and the caption/CTA pipeline.
+ */
+import type { EditPlan } from "../schema";
+
+export const samplePlan: EditPlan = {
+  assumptions: [
+    "No source footage provided -> scenes use colored placeholder backgrounds",
+    "9:16 vertical, 20s, royalty-free/AI music only",
+  ],
+  format: { ratio: "9:16", duration_sec: 20, fps: 30 },
+  cut_ranges: [],
+  timeline: [
+    {
+      start: 0,
+      end: 1.5,
+      source_clip: "after_highlight",
+      speed: 1,
+      narration: "",
+      subtitle: "발, 다시 편해질 수 있어요?",
+      subtitle_emphasis: "편해질",
+      motion: { type: "zoom_punch", params: { scale: 1.15 } },
+      sfx: [{ at: 0, type: "riser" }],
+    },
+    {
+      start: 1.5,
+      end: 4.5,
+      source_clip: "before_clip",
+      speed: 1,
+      narration: "걸을 때마다 시큰한 발 앞쪽.",
+      subtitle: "걸을 때마다 불편한 발",
+      subtitle_emphasis: "불편한",
+      motion: { type: "circle_highlight", params: { x: 0.5, y: 0.62 } },
+      sfx: [{ at: 0, type: "whoosh" }],
+    },
+    {
+      start: 4.5,
+      end: 8,
+      source_clip: "cause_clip",
+      speed: 1,
+      narration: "원인은 무너진 발가락 균형.",
+      subtitle: "무너진 발가락 균형",
+      subtitle_emphasis: "균형",
+      motion: { type: "arrow_highlight", params: { x: 0.5, y: 0.55 } },
+      sfx: [{ at: 0, type: "ding" }],
+    },
+    {
+      start: 8,
+      end: 12,
+      source_clip: "care_process_clip",
+      speed: 1,
+      narration: "발가락 정렬을 하나씩 잡아갑니다.",
+      subtitle: "발가락 정렬 관리",
+      subtitle_emphasis: "관리",
+      motion: { type: "text_popup", params: { text: "STEP 관리" } },
+      sfx: [{ at: 0, type: "pop" }],
+    },
+    {
+      start: 12,
+      end: 16,
+      source_clip: "before_after_split",
+      speed: 1,
+      narration: "발가락이 바뀌면 몸의 중심이 바뀝니다.",
+      subtitle: "중심이 바뀝니다",
+      subtitle_emphasis: "중심",
+      motion: { type: "before_after_split", params: {} },
+      sfx: [{ at: 0, type: "riser" }],
+    },
+    {
+      start: 16,
+      end: 18,
+      source_clip: "after_result_clip",
+      speed: 1,
+      narration: "3주간의 변화 기록.",
+      subtitle: "3주 변화 기록",
+      subtitle_emphasis: "3주",
+      motion: { type: "number_countup", params: { from: 0, to: 3, suffix: "주" } },
+      sfx: [{ at: 0, type: "ding" }],
+    },
+    {
+      start: 18,
+      end: 20,
+      source_clip: "cta_card",
+      speed: 1,
+      narration: "지금 상담 예약하세요.",
+      subtitle: "프로필 링크에서 상담 예약",
+      subtitle_emphasis: "상담 예약",
+      motion: { type: "ending_cta_card", params: { button: "상담 예약" } },
+      sfx: [{ at: 0, type: "pop" }],
+    },
+  ],
+  music: {
+    genre: "warm acoustic / soft piano",
+    bpm: 90,
+    mood: "차분하고 신뢰감 있는",
+    duck_db: -18,
+    ai_prompt:
+      "calm trustworthy soft piano with light acoustic guitar, 90 bpm, gentle, hopeful, no vocals, royalty-free",
+  },
+  voice: { gender: "female", age: "40s", tone: "차분하고 신뢰감 있는", speed: 1 },
+  cta: { text: "프로필 링크에서 상담 예약", start: 18 },
+  caption: {
+    text: "발가락이 바뀌면 몸의 중심이 바뀝니다. 발 앞쪽 불편함, 균형부터 다시 봅니다.",
+    hashtags: ["#발가락", "#발건강", "#체형균형", "#40대건강", "#50대건강"],
+  },
+  thumbnail_text: "발가락이 바뀌면 중심이 바뀐다",
+};
