@@ -12,6 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     status: job.status,
     progress: job.progress,
     message: job.message,
+    queuePosition: job.queuePosition,
     error: job.error,
     planSummary: job.planSummary,
     videoUrl: job.status === "done" ? `/api/jobs/${job.id}/video` : null,

@@ -8,6 +8,7 @@ import { parseEditPlan } from "@/schema";
 import type { SourceClipInfo } from "@/providers/types";
 import { probeClip } from "@/probe";
 import { jobStore, jobDir } from "@/server/jobs";
+import { renderQueue } from "@/server/queue";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -53,21 +54,26 @@ export async function POST(req: NextRequest) {
   jobStore.create(id);
   const outPath = path.join(dir, "output.mp4");
 
-  void renderPlan(parsed, clips, {
-    outPath,
-    log: (stage, detail) => jobStore.markStage(id, stage, detail),
-  })
-    .then((res) => {
-      jobStore.markDone(
-        id,
-        res.outPath,
-        { scenes: res.plan.timeline.length, duration: res.plan.format.duration_sec },
-        res.thumbnailPath,
-      );
-    })
-    .catch((e: unknown) => {
-      jobStore.markError(id, e instanceof Error ? e.message : String(e));
-    });
+  renderQueue.enqueue({
+    id,
+    onQueued: (position) => jobStore.markQueued(id, position),
+    run: () =>
+      renderPlan(parsed, clips, {
+        outPath,
+        log: (stage, detail) => jobStore.markStage(id, stage, detail),
+      })
+        .then((res) => {
+          jobStore.markDone(
+            id,
+            res.outPath,
+            { scenes: res.plan.timeline.length, duration: res.plan.format.duration_sec },
+            res.thumbnailPath,
+          );
+        })
+        .catch((e: unknown) => {
+          jobStore.markError(id, e instanceof Error ? e.message : String(e));
+        }),
+  });
 
   return NextResponse.json({ id });
 }

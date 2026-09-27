@@ -30,6 +30,7 @@ interface Job {
   planSummary: { scenes: number; duration: number } | null;
   videoUrl: string | null;
   thumbnailUrl: string | null;
+  queuePosition?: number;
 }
 
 const RATIOS: { value: Ratio; label: string; box: string }[] = [

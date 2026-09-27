@@ -14,6 +14,7 @@ export interface Job {
   status: JobStatus;
   progress: number; // 0-100
   message: string;
+  queuePosition: number; // 1-based while waiting; 0 once running/done
   outPath: string | null;
   thumbnailPath: string | null;
   error: string | null;
@@ -43,6 +44,7 @@ class JobStore {
       status: "queued",
       progress: 0,
       message: "Queued",
+      queuePosition: 0,
       outPath: null,
       thumbnailPath: null,
       error: null,
@@ -53,6 +55,16 @@ class JobStore {
     return job;
   }
 
+  /** Mark a job as waiting in the render queue at a 1-based position. */
+  markQueued(id: string, position: number) {
+    const job = this.jobs.get(id);
+    if (!job) return;
+    job.status = "queued";
+    job.queuePosition = position;
+    job.progress = 2;
+    job.message = position > 1 ? `Queued — ${position} in line` : "Queued — starting soon";
+  }
+
   get(id: string): Job | undefined {
     return this.jobs.get(id);
   }
@@ -60,6 +72,7 @@ class JobStore {
   markStage(id: string, stage: string, detail?: string) {
     const job = this.jobs.get(id);
     if (!job) return;
+    job.queuePosition = 0; // it's running now
     const mapped = STAGE_PROGRESS[stage];
     if (mapped) {
       job.status = mapped.status;

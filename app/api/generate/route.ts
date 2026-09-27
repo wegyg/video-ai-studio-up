@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { runPipeline } from "@/pipeline";
 import type { AspectRatio, CaptionStyle } from "@/schema";
 import { jobStore, jobDir } from "@/server/jobs";
+import { renderQueue } from "@/server/queue";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // allow long renders
@@ -47,22 +48,27 @@ export async function POST(req: NextRequest) {
   jobStore.create(id);
   const outPath = path.join(dir, "output.mp4");
 
-  // Run the pipeline in the background; the client polls /api/jobs/:id.
-  void runPipeline(
-    { brief, clipPaths, ratio, durationSec: duration, captionStyle, outPath },
-    { onProgress: (stage, detail) => jobStore.markStage(id, stage, detail) },
-  )
-    .then((res) => {
-      jobStore.markDone(
-        id,
-        res.outPath,
-        { scenes: res.plan.timeline.length, duration: res.plan.format.duration_sec },
-        res.thumbnailPath,
-      );
-    })
-    .catch((e: unknown) => {
-      jobStore.markError(id, e instanceof Error ? e.message : String(e));
-    });
+  // Enqueue; the render runs when a concurrency slot frees. Client polls /api/jobs/:id.
+  renderQueue.enqueue({
+    id,
+    onQueued: (position) => jobStore.markQueued(id, position),
+    run: () =>
+      runPipeline(
+        { brief, clipPaths, ratio, durationSec: duration, captionStyle, outPath },
+        { onProgress: (stage, detail) => jobStore.markStage(id, stage, detail) },
+      )
+        .then((res) => {
+          jobStore.markDone(
+            id,
+            res.outPath,
+            { scenes: res.plan.timeline.length, duration: res.plan.format.duration_sec },
+            res.thumbnailPath,
+          );
+        })
+        .catch((e: unknown) => {
+          jobStore.markError(id, e instanceof Error ? e.message : String(e));
+        }),
+  });
 
   return NextResponse.json({ id });
 }
