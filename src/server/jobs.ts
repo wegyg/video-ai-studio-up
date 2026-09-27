@@ -15,6 +15,7 @@ export interface Job {
   progress: number; // 0-100
   message: string;
   outPath: string | null;
+  thumbnailPath: string | null;
   error: string | null;
   planSummary: { scenes: number; duration: number } | null;
   createdAt: number;
@@ -29,6 +30,7 @@ const STAGE_PROGRESS: Record<string, { status: JobStatus; progress: number }> = 
   tts: { status: "validate", progress: 55 },
   render: { status: "render", progress: 70 },
   composite: { status: "composite", progress: 88 },
+  thumbnail: { status: "composite", progress: 95 },
   done: { status: "done", progress: 100 },
 };
 
@@ -42,6 +44,7 @@ class JobStore {
       progress: 0,
       message: "Queued",
       outPath: null,
+      thumbnailPath: null,
       error: null,
       planSummary: null,
       createdAt: Date.now(),
@@ -65,13 +68,14 @@ class JobStore {
     job.message = detail ? `${stage}: ${detail}` : stage;
   }
 
-  markDone(id: string, outPath: string, planSummary: Job["planSummary"]) {
+  markDone(id: string, outPath: string, planSummary: Job["planSummary"], thumbnailPath?: string | null) {
     const job = this.jobs.get(id);
     if (!job) return;
     job.status = "done";
     job.progress = 100;
     job.message = "Done";
     job.outPath = outPath;
+    job.thumbnailPath = thumbnailPath ?? null;
     job.planSummary = planSummary;
   }
 

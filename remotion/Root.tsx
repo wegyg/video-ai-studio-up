@@ -1,6 +1,7 @@
 import React from "react";
-import { Composition } from "remotion";
+import { Composition, Still } from "remotion";
 import { PlanVideo } from "./PlanVideo";
+import { Thumbnail } from "./Thumbnail";
 import { ratioToDimensions } from "./dimensions";
 import { parseEditPlan, type EditPlan } from "../src/schema";
 import { samplePlan } from "../src/fixtures/sample-plan";
@@ -11,6 +12,7 @@ const defaultPlan = parseEditPlan(samplePlan);
 
 export const RemotionRoot: React.FC = () => {
   return (
+    <>
     <Composition
       id="Plan"
       component={PlanVideo as React.FC<Record<string, unknown>>}
@@ -37,5 +39,20 @@ export const RemotionRoot: React.FC = () => {
         };
       }}
     />
+
+    {/* Single-frame thumbnail; dimensions follow the plan ratio. */}
+    <Still
+      id="Thumbnail"
+      component={Thumbnail as React.FC<Record<string, unknown>>}
+      width={ratioToDimensions(defaultPlan.format.ratio).width}
+      height={ratioToDimensions(defaultPlan.format.ratio).height}
+      defaultProps={{ plan: defaultPlan } as unknown as Record<string, unknown>}
+      calculateMetadata={({ props }) => {
+        const plan = parseEditPlan((props as { plan: EditPlan }).plan);
+        const { width, height } = ratioToDimensions(plan.format.ratio);
+        return { width, height, props: { plan } as unknown as Record<string, unknown> };
+      }}
+    />
+    </>
   );
 };

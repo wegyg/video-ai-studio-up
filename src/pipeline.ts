@@ -6,7 +6,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { bundle } from "@remotion/bundler";
-import { renderMedia, selectComposition } from "@remotion/renderer";
+import { renderMedia, renderStill, selectComposition } from "@remotion/renderer";
 
 import type { AspectRatio, EditPlan } from "./schema";
 import { validatePlan, formatIssues, type ValidationResult } from "./validate";
@@ -35,6 +35,7 @@ export interface PipelineDeps {
 
 export interface PipelineResult {
   outPath: string;
+  thumbnailPath: string | null;
   plan: EditPlan;
   validation: ValidationResult;
 }
@@ -187,8 +188,25 @@ export async function renderPlan(
     /* ignore */
   }
 
+  // 9) Thumbnail (single still) — reuses the same Remotion bundle. ----------
+  log("thumbnail");
+  let thumbnailPath: string | null = path.join(path.dirname(outPath), "thumbnail.png");
+  try {
+    const still = await selectComposition({ serveUrl, id: "Thumbnail", inputProps: { plan } });
+    await renderStill({
+      composition: still,
+      serveUrl,
+      output: thumbnailPath,
+      inputProps: { plan },
+      imageFormat: "png",
+    });
+  } catch (e) {
+    console.warn(`[thumbnail] failed: ${(e as Error).message}`);
+    thumbnailPath = null;
+  }
+
   log("done", outPath);
-  return { outPath, plan, validation };
+  return { outPath, thumbnailPath, plan, validation };
 }
 
 /**

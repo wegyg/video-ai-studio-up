@@ -22,6 +22,7 @@ interface Job {
   error: string | null;
   planSummary: { scenes: number; duration: number } | null;
   videoUrl: string | null;
+  thumbnailUrl: string | null;
 }
 
 const RATIOS: { value: Ratio; label: string; box: string }[] = [
@@ -93,6 +94,7 @@ export default function Home() {
       error: null,
       planSummary: null,
       videoUrl: null,
+      thumbnailUrl: null,
     });
   }
 
@@ -371,13 +373,32 @@ export default function Home() {
                 </p>
               )}
               {done && (
-                <a
-                  href={job!.videoUrl!}
-                  download
-                  className="block w-full rounded-xl border border-accent py-2.5 text-center font-medium text-accent transition hover:bg-accent hover:text-white"
-                >
-                  ⬇ Download MP4
-                </a>
+                <div className="space-y-2">
+                  <a
+                    href={job!.videoUrl!}
+                    download
+                    className="block w-full rounded-xl border border-accent py-2.5 text-center font-medium text-accent transition hover:bg-accent hover:text-white"
+                  >
+                    ⬇ Download MP4
+                  </a>
+                  {job.thumbnailUrl && (
+                    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={job.thumbnailUrl}
+                        alt="thumbnail"
+                        className="h-16 w-16 rounded-lg object-cover"
+                      />
+                      <a
+                        href={job.thumbnailUrl}
+                        download
+                        className="flex-1 text-center text-sm font-medium text-white/70 hover:text-white"
+                      >
+                        🖼️ Download thumbnail
+                      </a>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

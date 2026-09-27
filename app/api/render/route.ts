@@ -58,10 +58,12 @@ export async function POST(req: NextRequest) {
     log: (stage, detail) => jobStore.markStage(id, stage, detail),
   })
     .then((res) => {
-      jobStore.markDone(id, res.outPath, {
-        scenes: res.plan.timeline.length,
-        duration: res.plan.format.duration_sec,
-      });
+      jobStore.markDone(
+        id,
+        res.outPath,
+        { scenes: res.plan.timeline.length, duration: res.plan.format.duration_sec },
+        res.thumbnailPath,
+      );
     })
     .catch((e: unknown) => {
       jobStore.markError(id, e instanceof Error ? e.message : String(e));

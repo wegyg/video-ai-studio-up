@@ -15,5 +15,6 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     error: job.error,
     planSummary: job.planSummary,
     videoUrl: job.status === "done" ? `/api/jobs/${job.id}/video` : null,
+    thumbnailUrl: job.status === "done" && job.thumbnailPath ? `/api/jobs/${job.id}/thumbnail` : null,
   });
 }
