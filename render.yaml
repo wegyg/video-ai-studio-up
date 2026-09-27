@@ -1,0 +1,37 @@
+# Render.com Blueprint — one-click deploy for ShortsDirector.
+# In Render: New + → "Blueprint" → connect this repo → it reads this file.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: shorts-director
+    runtime: docker            # build from the Dockerfile in the repo
+    dockerfilePath: ./Dockerfile
+    plan: starter              # video rendering needs RAM/CPU; free tier is too small
+                               # (change to "free" to try, but renders may OOM/timeout)
+    region: oregon
+    healthCheckPath: /
+    autoDeploy: true           # redeploy on every push to the connected branch
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # NOTE: do not set PORT here — Render injects $PORT and `next start` honors it.
+      # Render's ephemeral disk is fine — outputs are downloaded right after render.
+      - key: SD_WORK_DIR
+        value: /data
+      # Cap simultaneous renders so a small instance doesn't thrash.
+      - key: RENDER_CONCURRENCY
+        value: "1"
+      # Background music on by default (procedural, no files/keys).
+      - key: MUSIC_ENABLED
+        value: "true"
+      # ---- Optional upgrades: set these in the Render dashboard, not here. ----
+      # LLM_API_KEY / LLM_BASE_URL / LLM_MODEL   (smarter scripts; Groq/OpenRouter)
+      # TTS_API_KEY / TTS_BASE_URL / TTS_MODEL / TTS_VOICE   (spoken narration)
+      - key: LLM_API_KEY
+        sync: false            # prompt in dashboard; never committed
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: TTS_API_KEY
+        sync: false

@@ -11,6 +11,32 @@ FFmpeg). That shapes where it can run.
 
 ---
 
+## Option 0 — Render.com (one-click, gets you a public URL) ⭐
+
+This repo ships a `render.yaml` Blueprint, so Render builds the Docker image and
+gives you a live `https://<name>.onrender.com` URL. No credit card to start.
+
+1. Push this repo to GitHub (already done if you're reading this on GitHub).
+2. Go to **https://dashboard.render.com** → sign up (GitHub login is easiest).
+3. Click **New +  →  Blueprint**.
+4. **Connect** this repository (`video-ai-studio-up`). Render detects `render.yaml`.
+5. Review the plan. The Blueprint uses the **Starter** plan because video
+   rendering needs RAM/CPU (the Free plan often OOMs/times out on renders). You
+   can switch it to **Free** to try, or keep Starter for reliable renders.
+6. Click **Apply**. First build takes a few minutes (installs FFmpeg, fonts,
+   Chromium). When it goes live, open the URL Render shows you. 🎉
+
+**Optional upgrades** (set later in the service's *Environment* tab — never in
+the file): `LLM_API_KEY` + `LLM_BASE_URL` + `LLM_MODEL` for smarter scripts
+(Groq/OpenRouter), `TTS_API_KEY` for spoken narration. The app runs fully
+without them.
+
+> Free-plan notes: the service sleeps when idle (first request after a nap is
+> slow to wake), and rendering long/complex shorts may exceed free limits.
+> Starter avoids the cold start and has enough memory for renders.
+
+---
+
 ## Option A — Docker (recommended)
 
 The included `Dockerfile` bundles Node 22, FFmpeg, Chromium runtime libs, and
