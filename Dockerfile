@@ -22,6 +22,10 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# Pre-download Remotion's headless Chromium shell so the FIRST render in
+# production is fast (otherwise it fetches ~108MB on the first request).
+RUN npx remotion browser ensure || true
+
 ENV NODE_ENV=production
 ENV PORT=3000
 # Persist job/output files outside the container if you mount a volume here.

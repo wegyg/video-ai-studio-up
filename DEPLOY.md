@@ -25,7 +25,15 @@ docker run -p 3000:3000 -v $(pwd)/data:/data shorts-director
 - Rendered files + job working dirs go to `/data` (mount a volume to persist).
 - Add optional keys with `-e LLM_API_KEY=... -e TTS_API_KEY=...` (see `.env.example`).
 
+The image **pre-bakes** Remotion's headless Chromium at build time, so the first
+render is fast (no ~108 MB download on the first request). Set
+`RENDER_CONCURRENCY` (default 2) to cap simultaneous renders.
+
 Works on any Docker host: Fly.io, Render, Railway, a plain VM, etc.
+
+**Verified:** `docker build` → `docker run` → `POST /api/plan` → `POST /api/render`
+→ poll `/api/jobs/:id` → download a real 1080×1920 MP4 (h264+aac) + thumbnail PNG,
+entirely inside the container.
 
 ## Option B — Bare VM / any Node host
 
