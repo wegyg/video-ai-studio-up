@@ -97,32 +97,35 @@ export async function muxAudio(
   }
 
   const inputs: string[] = ["-i", videoPath];
-  const chains: string[] = [];
-  const mixLabels: string[] = [];
+  let narIdx = -1;
+  let musIdx = -1;
   let idx = 1;
-
   if (narrationPath) {
     inputs.push("-i", narrationPath);
-    chains.push(`[${idx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo[nar]`);
-    mixLabels.push("[nar]");
-    idx++;
+    narIdx = idx++;
   }
   if (musicPath) {
     inputs.push("-stream_loop", "-1", "-i", musicPath);
-    const gain = Math.pow(10, duckDb / 20); // dB -> linear
-    chains.push(
-      `[${idx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${gain.toFixed(3)}[mus]`,
-    );
-    mixLabels.push("[mus]");
-    idx++;
+    musIdx = idx++;
   }
 
-  const mix =
-    mixLabels.length > 1
-      ? `${mixLabels.join("")}amix=inputs=${mixLabels.length}:normalize=0:duration=first[aout]`
-      : `${mixLabels[0]}anull[aout]`;
-
-  const filterComplex = [...chains, mix].join(";");
+  let filterComplex: string;
+  if (narIdx >= 0 && musIdx >= 0) {
+    // Sidechain-duck the music by the narration: music dips ONLY while the
+    // narration actually has signal. With silent narration, music stays full.
+    const threshold = Math.pow(10, duckDb / 20); // duck target as ratio hint
+    filterComplex =
+      `[${narIdx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo,apad,asplit=2[narmix][narsc];` +
+      `[${musIdx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo[mus];` +
+      `[mus][narsc]sidechaincompress=threshold=0.05:ratio=8:attack=20:release=400:makeup=1[musd];` +
+      `[narmix][musd]amix=inputs=2:normalize=0:duration=first,volume=3.0[aout]`;
+    void threshold;
+  } else if (narIdx >= 0) {
+    filterComplex = `[${narIdx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo,volume=1.6[aout]`;
+  } else {
+    // music only -> play at full level
+    filterComplex = `[${musIdx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo,volume=2.2[aout]`;
+  }
 
   await pexec("ffmpeg", [
     "-y",

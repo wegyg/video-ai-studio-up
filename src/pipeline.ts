@@ -238,15 +238,19 @@ async function compositeWithFootage(
 
 
 /**
- * Resolve a background music track for the plan. Implemented in feature #3
- * (procedural FFmpeg bed + optional local track). Placeholder returns null
- * (no music) until then.
+ * Resolve a background music track for the plan: a local royalty-free file if
+ * present, else a procedurally-synthesized tone-aware bed (FFmpeg). Music is on
+ * by default; set MUSIC_ENABLED=false to disable.
  */
 async function resolveMusic(
-  _plan: EditPlan,
-  _workDir: string,
-  _totalSec: number,
-  _log: (stage: string, detail?: string) => void,
+  plan: EditPlan,
+  workDir: string,
+  totalSec: number,
+  log: (stage: string, detail?: string) => void,
 ): Promise<string | null> {
-  return null;
+  if (process.env.MUSIC_ENABLED === "false") return null;
+  const { resolveMusicTrack } = await import("./music");
+  const res = await resolveMusicTrack(plan, workDir, totalSec);
+  if (res) log("music", `${res.source} (${plan.music.mood}, ${plan.music.bpm}bpm)`);
+  return res?.path ?? null;
 }
