@@ -4,6 +4,7 @@ import type { EditPlan } from "../src/schema";
 import { SceneBackground } from "./components/SceneBackground";
 import { Subtitle } from "./components/Subtitle";
 import { MotionOverlay } from "./components/Motion";
+import { ensureKoreanFont } from "./fonts";
 
 const ACCENT = "#ff5252";
 
@@ -27,6 +28,7 @@ export const PlanVideo: React.FC<{
 }> = ({ plan, clipSrcMap = {}, mode = "full" }) => {
   const { fps } = useVideoConfig();
   const overlayOnly = mode === "overlay";
+  ensureKoreanFont();
 
   return (
     <AbsoluteFill style={{ backgroundColor: overlayOnly ? "transparent" : "#000" }}>

@@ -2,7 +2,7 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, spring, interpolate } from "remotion";
 import type { Motion as MotionSchema } from "../../src/schema";
 
-const FONT = '"Noto Sans CJK KR", "Noto Sans KR", "Noto Sans", system-ui, sans-serif';
+const FONT = '"Noto Sans KR", "Noto Sans CJK KR", "Noto Sans", system-ui, sans-serif';
 
 /**
  * Overlay motion-graphic for a scene. Each preset draws animated graphics

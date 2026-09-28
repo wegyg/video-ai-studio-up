@@ -1,8 +1,9 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import type { EditPlan } from "../src/schema";
+import { ensureKoreanFont } from "./fonts";
 
-const FONT = '"Noto Sans CJK KR", "Noto Sans KR", "Noto Sans", system-ui, sans-serif';
+const FONT = '"Noto Sans KR", "Noto Sans CJK KR", "Noto Sans", system-ui, sans-serif';
 const ACCENT = "#ff5252";
 
 /**
@@ -11,6 +12,7 @@ const ACCENT = "#ff5252";
  * Remotion (perfect font/CJK support), exported as PNG via renderStill.
  */
 export const Thumbnail: React.FC<{ plan: EditPlan }> = ({ plan }) => {
+  ensureKoreanFont();
   const hook = plan.timeline[0];
   const headline = (plan.thumbnail_text || hook?.subtitle || "").trim();
   const seed = hook?.source_clip ?? "thumb";

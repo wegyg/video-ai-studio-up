@@ -55,9 +55,31 @@ async function startNext(port) {
   // Route generated files to the user's app-data folder (writable in a packaged app).
   process.env.SD_WORK_DIR = process.env.SD_WORK_DIR || path.join(app.getPath("userData"), "jobs");
   process.env.NODE_ENV = "production";
+  // Let the render pipeline resolve bundled assets (remotion entry) relative to
+  // the app dir, since the packaged app's CWD is the executable folder.
+  process.env.SD_APP_DIR = APP_DIR;
   // Keep a single Chromium tab per render on typical laptops.
   process.env.RENDER_MEDIA_CONCURRENCY = process.env.RENDER_MEDIA_CONCURRENCY || "1";
   process.env.RENDER_CONCURRENCY = process.env.RENDER_CONCURRENCY || "1";
+
+  // Resolve the bundled ffmpeg/ffprobe HERE (plain Node context, resolution
+  // works) and hand absolute paths to the Next server via env. The server's
+  // code is webpack-bundled, where require("ffmpeg-static") can't be trusted —
+  // so passing explicit paths is the reliable fix for "spawn ffmpeg ENOENT".
+  try {
+    const ffmpegStatic = require(path.join(APP_DIR, "node_modules", "ffmpeg-static"));
+    const ffmpegAbs = typeof ffmpegStatic === "string" ? ffmpegStatic : ffmpegStatic?.path;
+    if (ffmpegAbs) process.env.FFMPEG_PATH = process.env.FFMPEG_PATH || ffmpegAbs;
+  } catch (e) {
+    /* leave FFMPEG_PATH unset -> resolver falls back */
+  }
+  try {
+    const ffprobeStatic = require(path.join(APP_DIR, "node_modules", "ffprobe-static"));
+    const ffprobeAbs = typeof ffprobeStatic === "string" ? ffprobeStatic : ffprobeStatic?.path;
+    if (ffprobeAbs) process.env.FFPROBE_PATH = process.env.FFPROBE_PATH || ffprobeAbs;
+  } catch (e) {
+    /* leave FFPROBE_PATH unset -> resolver falls back */
+  }
 
   // Ensure Remotion's headless Chromium shell is present (first launch may
   // fetch it once into a writable cache). Non-fatal if it can't — the render
@@ -123,13 +145,39 @@ function createWindow(url) {
   });
 }
 
+// Append a line to a boot log in userData (helps diagnose startup issues).
+function bootLog(msg) {
+  try {
+    const fs = require("node:fs");
+    const p = path.join(app.getPath("userData"), "boot.log");
+    fs.appendFileSync(p, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch {
+    /* ignore */
+  }
+}
+
 app.whenReady().then(async () => {
   try {
+    bootLog("app ready; APP_DIR=" + APP_DIR + " packaged=" + app.isPackaged);
     const port = await getFreePort();
+    bootLog("free port = " + port);
     await startNext(port);
+    bootLog("next server started; FFMPEG_PATH=" + (process.env.FFMPEG_PATH || "(unset)"));
     await waitForServer(port);
+    bootLog("server responding; opening window");
+    // Write the live URL so external tooling/tests can find it.
+    try {
+      require("node:fs").writeFileSync(
+        path.join(app.getPath("userData"), "server-url.txt"),
+        `http://127.0.0.1:${port}`,
+      );
+    } catch {
+      /* ignore */
+    }
     createWindow(`http://127.0.0.1:${port}`);
+    bootLog("window created OK");
   } catch (err) {
+    bootLog("STARTUP ERROR: " + (err && err.stack ? err.stack : err));
     dialog.showErrorBox("ShortsDirector failed to start", String(err && err.stack ? err.stack : err));
     app.quit();
   }

@@ -6,6 +6,8 @@ const nextConfig = {
     serverComponentsExternalPackages: [
       "@remotion/bundler",
       "@remotion/renderer",
+      "ffmpeg-static",
+      "ffprobe-static",
     ],
   },
 };

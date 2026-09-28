@@ -115,7 +115,11 @@ export async function renderPlan(
 
   // 7) Render (video only -> silent temp), then mux audio. ------------------
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  const serveUrl = await bundle({ entryPoint: path.resolve("remotion/index.ts") });
+  // Resolve the Remotion entry relative to the APP directory. In the packaged
+  // desktop app the process CWD is the executable's folder (not the app root),
+  // so we use SD_APP_DIR (set by Electron) when present, else process.cwd().
+  const appDir = process.env.SD_APP_DIR || process.cwd();
+  const serveUrl = await bundle({ entryPoint: path.join(appDir, "remotion", "index.ts") });
   const silentVideo = path.join(path.dirname(outPath), "_video_silent.mp4");
 
   // Low-memory render options for small/free hosts (e.g. Render free tier).

@@ -2,7 +2,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, spring, interpolate } from "remotion";
 import type { CaptionStyle } from "../../src/schema";
 
-const FONT = '"Noto Sans CJK KR", "Noto Sans KR", "Noto Sans", system-ui, sans-serif';
+const FONT = '"Noto Sans KR", "Noto Sans CJK KR", "Noto Sans", system-ui, sans-serif';
 
 interface Props {
   text: string;
