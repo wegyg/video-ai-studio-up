@@ -6,7 +6,7 @@ services:
     name: shorts-director
     runtime: docker            # build from the Dockerfile in the repo
     dockerfilePath: ./Dockerfile
-    plan: starter              # video rendering needs RAM/CPU; free tier is too small
+    plan: free              # video rendering needs RAM/CPU; free tier is too small
                                # (change to "free" to try, but renders may OOM/timeout)
     region: oregon
     healthCheckPath: /
