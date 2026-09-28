@@ -106,6 +106,14 @@ export default function Home() {
       try {
         const r = await fetch(`/api/jobs/${job.id}`, { cache: "no-store" });
         if (r.ok) setJob(await r.json());
+        else if (r.status === 404)
+          setJob((j) =>
+            j && {
+              ...j,
+              status: "error",
+              error: "서버가 재시작되어 작업이 중단됐습니다 (메모리 부족 가능성). 다시 시도해 주세요.",
+            },
+          );
       } catch {
         /* keep last state */
       }
