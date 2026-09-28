@@ -9,12 +9,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { EditPlan } from "./schema";
 import type { TTSProvider } from "./providers/types";
+import { ffmpegPath, ffprobePath } from "./ffmpeg";
 
 const pexec = promisify(execFile);
 
 async function ffprobeDuration(file: string): Promise<number> {
   try {
-    const { stdout } = await pexec("ffprobe", [
+    const { stdout } = await pexec(ffprobePath(), [
       "-v", "error", "-show_entries", "format=duration",
       "-of", "default=noprint_wrappers=1:nokey=1", file,
     ]);
@@ -66,7 +67,7 @@ export async function buildNarrationTrack(
     `;${mixLabels}amix=inputs=${parts.length}:normalize=0:duration=longest[mix];` +
     `[mix]atrim=0:${totalSec},asetpts=N/SR/TB[out]`;
 
-  await pexec("ffmpeg", [
+  await pexec(ffmpegPath(), [
     "-y",
     ...inputs,
     "-filter_complex", filterComplex,
@@ -127,7 +128,7 @@ export async function muxAudio(
     filterComplex = `[${musIdx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo,volume=2.2[aout]`;
   }
 
-  await pexec("ffmpeg", [
+  await pexec(ffmpegPath(), [
     "-y",
     ...inputs,
     "-filter_complex", filterComplex,

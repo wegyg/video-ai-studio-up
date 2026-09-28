@@ -15,6 +15,7 @@ import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { TTSProvider } from "./types";
+import { ffmpegPath } from "../ffmpeg";
 
 const pexec = promisify(execFile);
 
@@ -30,7 +31,7 @@ export const silentTTS: TTSProvider = {
   name: "silent",
   async synthesize(text, outPath) {
     const dur = estimateSeconds(text);
-    await pexec("ffmpeg", [
+    await pexec(ffmpegPath(), [
       "-y",
       "-f", "lavfi",
       "-i", "anullsrc=r=44100:cl=stereo",

@@ -14,6 +14,7 @@ import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { EditPlan } from "./schema";
+import { ffmpegPath } from "./ffmpeg";
 
 const pexec = promisify(execFile);
 
@@ -94,7 +95,7 @@ export async function synthesizeBed(
     `[chordfx][kick]amix=inputs=2:normalize=0,volume=${gain.toFixed(3)},` +
     `afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeOut}:d=0.8[out]`;
 
-  await pexec("ffmpeg", [
+  await pexec(ffmpegPath(), [
     "-y",
     ...inputs,
     "-filter_complex", filter,

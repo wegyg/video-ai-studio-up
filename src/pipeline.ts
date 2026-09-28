@@ -10,6 +10,7 @@ import { renderMedia, renderStill, selectComposition } from "@remotion/renderer"
 
 import type { AspectRatio, EditPlan } from "./schema";
 import { validatePlan, formatIssues, type ValidationResult } from "./validate";
+import { ffmpegPath } from "./ffmpeg";
 import { probeClip } from "./probe";
 import type { PlanProvider, STTProvider, TTSProvider, SourceClipInfo, Transcript } from "./providers/types";
 import { freeSTT } from "./providers/free";
@@ -120,11 +121,12 @@ export async function renderPlan(
   // Low-memory render options for small/free hosts (e.g. Render free tier).
   // Fewer parallel Chromium tabs + memory-friendly flags avoid OOM/stalls.
   const renderConcurrency = Number(process.env.RENDER_MEDIA_CONCURRENCY) || 1;
+  // GL backend: let Remotion pick by default (safest across environments).
+  // Override with RENDER_GL=swangle|angle|egl|swiftshader if a host needs it.
+  const glEnv = process.env.RENDER_GL;
   const chromiumOptions = {
-    gl: "swangle" as const, // software GL (no GPU on cloud hosts)
+    ...(glEnv ? { gl: glEnv as "swangle" | "angle" | "egl" | "swiftshader" } : {}),
     headless: true,
-    // extra flags that keep Chromium's footprint small in containers
-    ignoreCertificateErrors: false,
   };
   const commonRender = {
     serveUrl,
@@ -255,7 +257,7 @@ async function compositeWithFootage(
     const clip = clips[i % clips.length];
     const seg = path.join(tmpDir, `seg_${i}.mp4`);
     // loop the source so short clips fill the scene; scale+crop to WxH; drop audio
-    await pexec("ffmpeg", [
+    await pexec(ffmpegPath(), [
       "-y",
       "-stream_loop", "-1", "-i", clip.path,
       "-t", String(dur),
@@ -272,10 +274,10 @@ async function compositeWithFootage(
   const listFile = path.join(tmpDir, "list.txt");
   fs.writeFileSync(listFile, segPaths.map((p) => `file '${p}'`).join("\n"));
   const bgPath = path.join(tmpDir, "bg.mp4");
-  await pexec("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", bgPath]);
+  await pexec(ffmpegPath(), ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", bgPath]);
 
   // 3) overlay the transparent Remotion layer on top of the footage bg
-  await pexec("ffmpeg", [
+  await pexec(ffmpegPath(), [
     "-y",
     "-i", bgPath,
     "-i", overlayPath,

@@ -2,7 +2,8 @@
   "name": "shorts-director",
   "version": "0.1.0",
   "private": true,
-  "description": "Video + one-line brief -> AI edit-plan JSON -> validated -> rendered vertical short (Remotion + FFmpeg)",
+  "description": "Video + one-line brief -> AI edit-plan JSON -> validated -> rendered vertical short (Remotion + FFmpeg). Runs as a web app or a desktop app.",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,12 +11,20 @@
     "remotion:studio": "remotion studio remotion/index.ts",
     "remotion:render": "remotion render remotion/index.ts",
     "plan:sample": "tsx scripts/render-sample.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "electron:dev": "next build && electron .",
+    "electron:start": "electron .",
+    "dist": "next build && electron-builder",
+    "dist:win": "next build && electron-builder --win",
+    "dist:mac": "next build && electron-builder --mac",
+    "dist:linux": "next build && electron-builder --linux"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.290",
     "@remotion/cli": "4.0.290",
     "@remotion/renderer": "4.0.290",
+    "ffmpeg-static": "5.2.0",
+    "ffprobe-static": "3.1.0",
     "next": "14.2.15",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -27,9 +36,47 @@
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
     "autoprefixer": "^10.4.20",
+    "electron": "32.2.0",
+    "electron-builder": "25.1.8",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "tsx": "4.19.1",
     "typescript": "5.5.4"
+  },
+  "build": {
+    "appId": "com.shortsdirector.app",
+    "productName": "ShortsDirector",
+    "files": [
+      "electron/**",
+      ".next/**",
+      "public/**",
+      "remotion/**",
+      "src/**",
+      "next.config.mjs",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**",
+      "node_modules/@remotion/**",
+      "node_modules/remotion/**"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.video"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "AudioVideo"
+    }
   }
 }

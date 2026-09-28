@@ -1,12 +1,13 @@
 /** ffprobe helpers for inspecting uploaded footage. */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { ffprobePath } from "./ffmpeg";
 
 const pexec = promisify(execFile);
 
 export async function probeClip(path: string): Promise<{ durationSec: number; width: number; height: number }> {
   try {
-    const { stdout } = await pexec("ffprobe", [
+    const { stdout } = await pexec(ffprobePath(), [
       "-v", "error",
       "-select_streams", "v:0",
       "-show_entries", "stream=width,height:format=duration",
