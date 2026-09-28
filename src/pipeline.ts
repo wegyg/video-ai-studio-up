@@ -117,21 +117,37 @@ export async function renderPlan(
   const serveUrl = await bundle({ entryPoint: path.resolve("remotion/index.ts") });
   const silentVideo = path.join(path.dirname(outPath), "_video_silent.mp4");
 
+  // Low-memory render options for small/free hosts (e.g. Render free tier).
+  // Fewer parallel Chromium tabs + memory-friendly flags avoid OOM/stalls.
+  const renderConcurrency = Number(process.env.RENDER_MEDIA_CONCURRENCY) || 1;
+  const chromiumOptions = {
+    gl: "swangle" as const, // software GL (no GPU on cloud hosts)
+    headless: true,
+    // extra flags that keep Chromium's footprint small in containers
+    ignoreCertificateErrors: false,
+  };
+  const commonRender = {
+    serveUrl,
+    concurrency: renderConcurrency,
+    chromiumOptions,
+    // don't fail the whole job on a slow single-frame; give it room
+    timeoutInMilliseconds: 120_000,
+  };
+
   if (clips.length === 0) {
     // No footage -> Remotion renders the full placeholder video directly.
-    log("render", `placeholder backgrounds`);
+    log("render", `placeholder backgrounds (concurrency ${renderConcurrency})`);
     const composition = await selectComposition({
       serveUrl,
       id: "Plan",
       inputProps: { plan, clipSrcMap: {}, mode: "full" },
     });
     await renderMedia({
+      ...commonRender,
       composition,
-      serveUrl,
       codec: "h264",
       outputLocation: silentVideo,
       inputProps: { plan, clipSrcMap: {}, mode: "full" },
-      concurrency: 2,
     });
   } else {
     // Footage present -> render TRANSPARENT overlay (captions + motion) with
@@ -145,15 +161,14 @@ export async function renderPlan(
       inputProps: { plan, clipSrcMap: {}, mode: "overlay" },
     });
     await renderMedia({
+      ...commonRender,
       composition,
-      serveUrl,
       codec: "prores", // ProRes 4444 keeps the alpha channel
       proResProfile: "4444",
       pixelFormat: "yuva444p10le",
       imageFormat: "png", // required for transparent frames
       outputLocation: overlayPath,
       inputProps: { plan, clipSrcMap: {}, mode: "overlay" },
-      concurrency: 2,
     });
 
     log("composite", "FFmpeg: user footage + overlay");

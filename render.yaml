@@ -21,6 +21,9 @@ services:
       # Cap simultaneous renders so a small instance doesn't thrash.
       - key: RENDER_CONCURRENCY
         value: "1"
+      # Single Chromium tab per render (low memory; avoids OOM on small hosts).
+      - key: RENDER_MEDIA_CONCURRENCY
+        value: "1"
       # Background music on by default (procedural, no files/keys).
       - key: MUSIC_ENABLED
         value: "true"
