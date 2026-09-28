@@ -48,6 +48,22 @@ const STAGES: { key: JobStatus; label: string }[] = [
   { key: "done", label: "Done" },
 ];
 
+function Spinner({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+      <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+type BusyAction = "plan" | "generate" | "render" | null;
+const BUSY_LABEL: Record<Exclude<BusyAction, null>, string> = {
+  plan: "업로드 및 편집 계획 생성 중…",
+  generate: "업로드 및 작업 시작 중…",
+  render: "렌더링 요청 중…",
+};
+
 export default function Home() {
   const [brief, setBrief] = useState("");
   const [ratio, setRatio] = useState<Ratio>("9:16");
@@ -57,6 +73,9 @@ export default function Home() {
   const [dragOver, setDragOver] = useState(false);
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const [plan, setPlan] = useState<UIPlan | null>(null); // editable draft
   const [planId, setPlanId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -65,6 +84,17 @@ export default function Home() {
     const vids = Array.from(incoming).filter((f) => f.type.startsWith("video/"));
     setClips((prev) => [...prev, ...vids]);
   }, []);
+
+  function begin(action: Exclude<BusyAction, null>) {
+    setBusy(true);
+    setBusyAction(action);
+    setStartedAt(Date.now());
+    setElapsed(0);
+  }
+  function end() {
+    setBusy(false);
+    setBusyAction(null);
+  }
 
   // poll job status
   useEffect(() => {
@@ -111,7 +141,7 @@ export default function Home() {
   // One-shot: generate + render immediately.
   async function handleGenerate() {
     if (!brief.trim()) return;
-    setBusy(true);
+    begin("generate");
     setJob(null);
     setPlan(null);
     try {
@@ -121,14 +151,14 @@ export default function Home() {
     } catch (e) {
       alert((e as Error).message);
     } finally {
-      setBusy(false);
+      end();
     }
   }
 
   // Two-step: get an editable plan first.
   async function handleReviewEdit() {
     if (!brief.trim()) return;
-    setBusy(true);
+    begin("plan");
     setJob(null);
     setPlan(null);
     try {
@@ -140,14 +170,14 @@ export default function Home() {
     } catch (e) {
       alert((e as Error).message);
     } finally {
-      setBusy(false);
+      end();
     }
   }
 
   // Render the (edited) plan.
   async function handleRenderPlan() {
     if (!plan) return;
-    setBusy(true);
+    begin("render");
     setJob(null);
     try {
       const r = await fetch("/api/render", {
@@ -161,12 +191,27 @@ export default function Home() {
     } catch (e) {
       alert((e as Error).message);
     } finally {
-      setBusy(false);
+      end();
     }
   }
 
   const done = job?.status === "done" && job.videoUrl;
   const running = job !== null && job.status !== "done" && job.status !== "error";
+  const loading = busy || running;
+  // elapsed-time counter while anything is in flight
+  useEffect(() => {
+    if (!loading || startedAt === null) return;
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [loading, startedAt]);
+  const loadingText =
+    busyAction !== null
+      ? BUSY_LABEL[busyAction]
+      : job?.status === "queued"
+        ? job.queuePosition
+          ? `대기열 ${job.queuePosition}번째…`
+          : "대기 중…"
+        : job?.message || "처리 중…";
   const boxClass = RATIOS.find((r) => r.value === ratio)?.box ?? "aspect-[9/16]";
 
   return (
@@ -307,7 +352,13 @@ export default function Home() {
               className="rounded-xl bg-accent py-3 font-semibold transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-40"
               title="Generate an editable plan you can tweak before rendering"
             >
-              {busy && !job ? "Working…" : "📝 Review & Edit"}
+              {busyAction === "plan" ? (
+                <span className="inline-flex items-center gap-2">
+                  <Spinner /> Working…
+                </span>
+              ) : (
+                "📝 Review & Edit"
+              )}
             </button>
             <button
               onClick={handleGenerate}
@@ -315,7 +366,13 @@ export default function Home() {
               className="rounded-xl border border-white/15 py-3 font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
               title="Skip editing and render straight away"
             >
-              ⚡ Quick Generate
+              {busyAction === "generate" || (running && !plan) ? (
+                <span className="inline-flex items-center gap-2">
+                  <Spinner /> Generating…
+                </span>
+              ) : (
+                "⚡ Quick Generate"
+              )}
             </button>
           </div>
 
@@ -328,7 +385,13 @@ export default function Home() {
                   disabled={busy || running}
                   className="flex-1 rounded-xl bg-accent py-2.5 font-semibold transition hover:bg-accent-dark disabled:opacity-40"
                 >
-                  {running ? "Rendering…" : "🎬 Render Video"}
+                  {running || busyAction === "render" ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Spinner /> Rendering…
+                    </span>
+                  ) : (
+                    "🎬 Render Video"
+                  )}
                 </button>
                 <button
                   onClick={() => setPlan(null)}
@@ -359,9 +422,18 @@ export default function Home() {
                 className="h-full w-full object-contain"
               />
             ) : (
-              <div className="px-6 text-center text-sm text-white/40">
-                {running ? "Rendering your short…" : "Your short will appear here"}
-              </div>
+              loading ? (
+                <div className="flex flex-col items-center gap-3 px-6 text-center" role="status" aria-live="polite">
+                  <Spinner className="h-10 w-10 text-accent" />
+                  <p className="text-sm text-white/80">{loadingText}</p>
+                  <p className="text-xs tabular-nums text-white/40">
+                    {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")} 경과
+                  </p>
+                  <p className="text-[11px] text-white/30">무료 서버라 1~3분 걸릴 수 있어요. 창을 닫지 마세요.</p>
+                </div>
+              ) : (
+                <div className="px-6 text-center text-sm text-white/40">Your short will appear here</div>
+              )
             )}
           </div>
 
