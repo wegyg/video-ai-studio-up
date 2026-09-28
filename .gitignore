@@ -10,3 +10,5 @@ tmp/
 
 *.tsbuildinfo
 next-env.d.ts
+
+dist-desktop/

@@ -81,6 +81,30 @@ npm run build && npm start          # http://localhost:3000
 In the browser: drop your clips, type a one-line brief, then either
 **Quick Generate** (one shot) or **Review & Edit** (tweak the plan first).
 
+### 🖥️ Desktop app (runs on your computer — fastest, no cloud limits)
+The same app wrapped in Electron. It boots the Next.js server in-process and
+opens a native window; **FFmpeg is bundled** (via `ffmpeg-static`), so nothing
+needs to be installed system-wide. All rendering uses your own CPU — no server,
+no memory limits, no bill.
+
+```bash
+npm install
+
+# Run the desktop app locally (builds the web bundle, then launches Electron):
+npm run electron:dev
+
+# Build a distributable installer for your OS:
+npm run dist:win     # Windows  -> dist-desktop/*.exe (NSIS installer)
+npm run dist:mac     # macOS    -> dist-desktop/*.dmg
+npm run dist:linux   # Linux    -> dist-desktop/*.AppImage
+```
+
+- Free by default; add optional `LLM_*` / `TTS_*` env vars for smarter scripts /
+  spoken voice (same dual free/premium model as the web app).
+- On first launch the app fetches Remotion's small headless Chromium once.
+- Cross-platform installers are best built **on that OS** (build the Windows
+  `.exe` on Windows, the `.dmg` on macOS, etc.).
+
 ### CLI
 ```bash
 # From a one-line brief only (placeholder backgrounds):
