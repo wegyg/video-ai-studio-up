@@ -426,8 +426,8 @@ export default function Home() {
                 <div className="flex flex-col items-center gap-3 px-6 text-center" role="status" aria-live="polite">
                   <Spinner className="h-10 w-10 text-accent" />
                   <p className="text-sm text-white/80">{loadingText}</p>
-                  <p className="text-xs tabular-nums text-white/40">
-                    {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")} 경과
+                  <p translate="no" className="notranslate text-xs tabular-nums text-white/40">
+                    {`${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")} 경과`}
                   </p>
                   <p className="text-[11px] text-white/30">무료 서버라 1~3분 걸릴 수 있어요. 창을 닫지 마세요.</p>
                 </div>
@@ -452,7 +452,7 @@ export default function Home() {
                 <span className={job.status === "error" ? "text-red-400" : "text-white/70"}>
                   {job.status === "error" ? job.error : job.message}
                 </span>
-                <span className="text-white/40">{job.progress}%</span>
+                <span translate="no" className="notranslate text-white/40">{`${job.progress}%`}</span>
               </div>
               {/* stage chips */}
               <div className="flex flex-wrap gap-1.5 text-xs text-white/50">
