@@ -1,9 +1,10 @@
 name: Build Windows Installer
 
-# Builds the Windows .exe on a Windows runner so you don't need any local
-# toolchain. Run it two ways:
+# Builds the Windows .exe on a Windows runner AND proves the app actually works
+# by generating a real 15s sample video from a reference URL and validating it
+# with ffprobe. Run it two ways:
 #   • Manually: GitHub → Actions → "Build Windows Installer" → Run workflow
-#   • On a version tag: git tag v0.1.0 && git push --tags  (also makes a Release)
+#   • On a version tag: git tag v0.1.4 && git push --tags  (also makes a Release)
 on:
   workflow_dispatch: {}
   push:
@@ -29,6 +30,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ---- Verification gate: prove the app can generate a video on Windows.
+      # This runs the SAME pipeline the desktop app uses (brief extraction from
+      # the reference URL -> plan -> Remotion+FFmpeg render), headless, then
+      # ffprobe-validates the MP4 (video stream, 1080x1920, ~15s). If this step
+      # fails, the whole workflow fails and no "완성" claim is valid.
+      - name: Verify — generate & validate 15s sample (bodycenter.kr)
+        run: npx tsx scripts/ci-sample.ts out/ci-sample.mp4 15 https://www.bodycenter.kr
+
+      - name: Upload sample video as artifact
+        if: always() # upload even on failure to aid debugging
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShortsDirector-Sample-Video
+          path: out/ci-sample.mp4
+          if-no-files-found: warn
+
       - name: Build Windows installer (.exe)
         run: npm run dist:win
         env:
@@ -48,5 +65,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist-desktop/*.exe
+          files: |
+            dist-desktop/*.exe
+            out/ci-sample.mp4
           generate_release_notes: true
