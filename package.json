@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Video + one-line brief -> AI edit-plan JSON -> validated -> rendered vertical short (Remotion + FFmpeg). Runs as a web app or a desktop app.",
+  "author": "ShortsDirector",
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
@@ -14,10 +15,10 @@
     "typecheck": "tsc --noEmit",
     "electron:dev": "next build && electron .",
     "electron:start": "electron .",
-    "dist": "next build && electron-builder",
-    "dist:win": "next build && electron-builder --win",
-    "dist:mac": "next build && electron-builder --mac",
-    "dist:linux": "next build && electron-builder --linux"
+    "dist": "next build && electron-builder --publish never",
+    "dist:win": "next build && electron-builder --win --publish never",
+    "dist:mac": "next build && electron-builder --mac --publish never",
+    "dist:linux": "next build && electron-builder --linux --publish never"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.290",
