@@ -6,10 +6,50 @@
  * All rendering happens locally on the user's machine (fast, no cloud limits).
  * Free by default; optional API keys still work via env.
  */
-const { app, BrowserWindow, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, shell, dialog } = require("electron");
 const path = require("node:path");
 const http = require("node:http");
 const net = require("node:net");
+
+const CREDIT = "개발: 몸의중심 이성진 · 1877-7323";
+
+// Application menu with a Korean "정보(About)" item showing the developer credit.
+function installMenu() {
+  const template = [
+    {
+      label: "숏츠디렉터",
+      submenu: [
+        {
+          label: "정보",
+          click: () => {
+            dialog.showMessageBox({
+              type: "info",
+              title: "정보",
+              message: "숏츠디렉터",
+              detail: `${CREDIT}\n\n영상과 한 줄로 만드는 CF 스타일 숏츠 제작기`,
+              buttons: ["확인"],
+            });
+          },
+        },
+        { type: "separator" },
+        { label: "종료", role: "quit" },
+      ],
+    },
+    {
+      label: "편집",
+      submenu: [
+        { label: "실행 취소", role: "undo" },
+        { label: "다시 실행", role: "redo" },
+        { type: "separator" },
+        { label: "잘라내기", role: "cut" },
+        { label: "복사", role: "copy" },
+        { label: "붙여넣기", role: "paste" },
+        { label: "모두 선택", role: "selectAll" },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 const isDev = !app.isPackaged;
 // In a packaged app, the Next project lives under resources/app (asar-unpacked
@@ -158,6 +198,7 @@ function bootLog(msg) {
 
 app.whenReady().then(async () => {
   try {
+    installMenu();
     bootLog("app ready; APP_DIR=" + APP_DIR + " packaged=" + app.isPackaged);
     const port = await getFreePort();
     bootLog("free port = " + port);

@@ -2,16 +2,16 @@
 
 /** Timeline editor for an EditPlan: edit per-scene copy/duration/motion, reorder. */
 
-const MOTIONS = [
-  "none",
-  "zoom_punch",
-  "circle_highlight",
-  "arrow_highlight",
-  "text_popup",
-  "before_after_split",
-  "number_countup",
-  "ending_cta_card",
-] as const;
+const MOTIONS: { value: string; label: string }[] = [
+  { value: "none", label: "없음" },
+  { value: "zoom_punch", label: "줌 강조" },
+  { value: "circle_highlight", label: "원형 강조" },
+  { value: "arrow_highlight", label: "화살표 강조" },
+  { value: "text_popup", label: "텍스트 팝업" },
+  { value: "before_after_split", label: "비포/애프터" },
+  { value: "number_countup", label: "숫자 카운트" },
+  { value: "ending_cta_card", label: "마무리 카드" },
+];
 
 // Loose local types (mirror src/schema); avoids importing server code client-side.
 export interface UIScene {
@@ -125,8 +125,8 @@ export default function PlanEditor({
               className="w-1/2 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-xs text-white/70 outline-none focus:border-accent"
             >
               {MOTIONS.map((m) => (
-                <option key={m} value={m} className="bg-[#1a1024]">
-                  {m}
+                <option key={m.value} value={m.value} className="bg-[#1a1024]">
+                  {m.label}
                 </option>
               ))}
             </select>

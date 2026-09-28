@@ -59,7 +59,8 @@
       "package.json"
     ],
     "extraMetadata": {
-      "main": "electron/main.js"
+      "main": "electron/main.js",
+      "author": "몸의중심 이성진 (1877-7323)"
     },
     "directories": {
       "output": "dist-desktop",
@@ -75,7 +76,8 @@
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "ShortsDirector-Setup-${version}.${ext}"
+      "artifactName": "ShortsDirector-Setup-${version}.${ext}",
+      "publisherName": "몸의중심 이성진 (1877-7323)"
     },
     "nsis": {
       "oneClick": false,

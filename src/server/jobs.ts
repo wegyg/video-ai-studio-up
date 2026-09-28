@@ -99,6 +99,23 @@ class JobStore {
     job.error = error;
     job.message = "Failed";
   }
+
+  /** Mark a job cancelled by the user; polling stops and it's dropped from view. */
+  cancel(id: string): boolean {
+    const job = this.jobs.get(id);
+    if (!job) return false;
+    job.status = "error";
+    job.error = "사용자가 작업을 취소했습니다.";
+    job.message = "취소됨";
+    this.cancelled.add(id);
+    return true;
+  }
+
+  isCancelled(id: string): boolean {
+    return this.cancelled.has(id);
+  }
+
+  private cancelled = new Set<string>();
 }
 
 // Persist across hot-reloads / route modules in dev.

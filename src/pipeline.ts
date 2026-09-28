@@ -196,7 +196,7 @@ export async function renderPlan(
     });
 
     log("composite", "FFmpeg: user footage + overlay");
-    await compositeWithFootage(plan, clips, overlayPath, silentVideo);
+    await compositeWithFootage(plan, clips, overlayPath, silentVideo, log);
     try {
       fs.unlinkSync(overlayPath);
     } catch {
@@ -260,6 +260,7 @@ async function compositeWithFootage(
   clips: SourceClipInfo[],
   overlayPath: string,
   outPath: string,
+  log: (stage: string, detail?: string) => void = () => {},
 ): Promise<void> {
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
@@ -273,7 +274,9 @@ async function compositeWithFootage(
 
   // 1) one normalized background segment per scene
   const segPaths: string[] = [];
+  const n = plan.timeline.length;
   for (let i = 0; i < plan.timeline.length; i++) {
+    log("composite", `${i + 1}/${n}`);
     const scene = plan.timeline[i];
     const dur = Math.max(0.1, scene.end - scene.start);
     const clip = clips[i % clips.length];

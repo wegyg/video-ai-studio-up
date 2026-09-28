@@ -1,0 +1,89 @@
+{
+  "app": {
+    "title": "숏츠디렉터",
+    "subtitle": "영상과 한 줄만 넣으면 AI가 편집을 기획하고 자막·모션·CTA까지 얹어 세로형 숏츠를 만들어 줍니다.",
+    "freeTag": "무료 · API 키 불필요"
+  },
+  "windowTitle": "숏츠디렉터",
+  "input": {
+    "briefLabel": "한 줄 설명",
+    "briefPlaceholder": "예: 여름 세일 홍보 / 발가락 교정 발건강 관리",
+    "referenceLabel": "참고 자료",
+    "referenceHint2": "(홈페이지 주소 / 참고 텍스트, 선택)",
+    "referencePlaceholder": "예: https://www.bodycenter.kr  또는  브랜드 소개·강조 문구를 붙여넣으세요",
+    "referenceNote": "주소를 넣고 '자료 분석'을 누르면 상호·서비스·문구를 뽑아 아래 브리프로 보여줍니다.",
+    "analyzeButton": "🔎 자료 분석",
+    "analyzing": "자료 분석 중…",
+    "clipsLabel": "내 영상 클립",
+    "optional": "(선택)",
+    "dropHere": "여기로 영상을 끌어다 놓거나",
+    "browse": "파일 선택",
+    "clipsNote": "영상이 없어도 됩니다. AI가 감각적인 배경을 자동으로 만들어요. (구글 드라이브에서 받은 영상도 가능)",
+    "ratioLabel": "화면 비율",
+    "captionLabel": "자막 스타일",
+    "durationLabel": "영상 길이",
+    "seconds": "초"
+  },
+  "ratio": { "vertical": "9:16 릴스", "square": "1:1 피드", "landscape": "16:9 유튜브" },
+  "caption": { "boldPop": "볼드 팝", "karaokeBar": "노래방", "minimal": "미니멀", "boxed": "박스" },
+  "brief": {
+    "title": "브리프 (수정 후 대본 생성)",
+    "name": "상호명",
+    "services": "핵심 서비스 3가지",
+    "tagline": "대표 문구",
+    "contact": "연락처",
+    "color": "대표 색상",
+    "hero": "대표 이미지",
+    "servicePlaceholder": "서비스",
+    "crawlFailed": "홈페이지를 읽지 못했습니다. 아래에 소개 문구를 직접 붙여넣어 주세요.",
+    "sourceUrl": "출처",
+    "confirmButton": "이 브리프로 대본 만들기"
+  },
+  "buttons": {
+    "reviewEdit": "📝 기획안 보고 편집",
+    "quickGenerate": "⚡ 바로 만들기",
+    "renderVideo": "🎬 영상 만들기",
+    "discard": "취소",
+    "cancel": "작업 취소",
+    "makeAnother": "새로 만들기",
+    "viewLog": "로그 보기",
+    "preparing": "준비 중…",
+    "generating": "생성 중…",
+    "rendering": "렌더링 중…"
+  },
+  "preview": {
+    "title": "미리보기",
+    "empty": "완성된 숏츠가 여기에 표시됩니다",
+    "rendering": "숏츠를 만드는 중…",
+    "timeHint": "보통 30초~2분 정도 걸립니다. 창을 닫지 마세요.",
+    "elapsed": "경과",
+    "eta": "예상 남은 시간",
+    "stalled": "진행이 지연되고 있습니다. 잠시만 기다려 주세요.",
+    "downloadVideo": "⬇ 영상 내려받기 (MP4)",
+    "downloadThumb": "🖼️ 썸네일 내려받기",
+    "planSummaryScenes": "개 장면",
+    "currentScene": "번째 장면 렌더링 중"
+  },
+  "stages": {
+    "reference": "자료 분석",
+    "script": "대본",
+    "voice": "음성",
+    "visuals": "영상 소스",
+    "render": "렌더링",
+    "done": "완료"
+  },
+  "status": {
+    "queued": "대기 중",
+    "queuedPosition": "대기열 {n}번째…",
+    "failed": "실패",
+    "serverRestarted": "서버가 재시작되어 작업이 중단됐습니다. 다시 시도해 주세요.",
+    "briefRequired": "한 줄 설명을 입력해 주세요.",
+    "clipsSelected": "개 선택됨"
+  },
+  "credit": {
+    "prefix": "개발",
+    "name": "몸의중심 이성진",
+    "phone": "1877-7323",
+    "aboutTitle": "정보"
+  }
+}
