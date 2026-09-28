@@ -99,6 +99,10 @@ npm run dist:mac     # macOS    -> dist-desktop/*.dmg
 npm run dist:linux   # Linux    -> dist-desktop/*.AppImage
 ```
 
+**🪟 Windows users:** see **[WINDOWS.md](./WINDOWS.md)** — download a prebuilt
+`.exe` from GitHub Actions/Releases (nothing to install), or double-click
+`build-windows.bat` to build it locally.
+
 - Free by default; add optional `LLM_*` / `TTS_*` env vars for smarter scripts /
   spoken voice (same dual free/premium model as the web app).
 - On first launch the app fetches Remotion's small headless Chromium once.

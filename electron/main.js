@@ -100,6 +100,23 @@ function createWindow(url) {
     return { action: "deny" };
   });
 
+  // When the user downloads an MP4/thumbnail, save it to their Downloads folder
+  // and reveal it in Explorer/Finder so it's easy to find (nice desktop touch).
+  mainWindow.webContents.session.on("will-download", (_event, item) => {
+    const downloads = app.getPath("downloads");
+    const dest = path.join(downloads, item.getFilename());
+    item.setSavePath(dest);
+    item.once("done", (_e, state) => {
+      if (state === "completed") {
+        try {
+          shell.showItemInFolder(dest);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  });
+
   mainWindow.loadURL(url);
   mainWindow.on("closed", () => {
     mainWindow = null;

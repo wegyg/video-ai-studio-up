@@ -1,0 +1,52 @@
+name: Build Windows Installer
+
+# Builds the Windows .exe on a Windows runner so you don't need any local
+# toolchain. Run it two ways:
+#   • Manually: GitHub → Actions → "Build Windows Installer" → Run workflow
+#   • On a version tag: git tag v0.1.0 && git push --tags  (also makes a Release)
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # needed to publish a Release when triggered by a tag
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows installer (.exe)
+        run: npm run dist:win
+        env:
+          # electron-builder: don't try to code-sign (no certificate in CI)
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Upload installer as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShortsDirector-Windows-Installer
+          path: dist-desktop/*.exe
+          if-no-files-found: error
+
+      # When triggered by a version tag, also attach the .exe to a GitHub Release
+      # so it has a permanent public download link.
+      - name: Publish to Release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-desktop/*.exe
+          generate_release_notes: true
