@@ -1,6 +1,6 @@
 {
   "name": "shorts-director",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Video + one-line brief -> AI edit-plan JSON -> validated -> rendered vertical short (Remotion + FFmpeg). Runs as a web app or a desktop app.",
   "author": "ShortsDirector",
