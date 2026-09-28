@@ -19,6 +19,7 @@ export const maxDuration = 300; // allow long renders
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const brief = String(form.get("brief") ?? "").trim();
+  const reference = String(form.get("reference") ?? "").trim();
   const ratio = (String(form.get("ratio") ?? "9:16") as AspectRatio) || "9:16";
   const duration = Number(form.get("duration") ?? 20) || 20;
   const captionStyle = form.get("caption_style")
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     onQueued: (position) => jobStore.markQueued(id, position),
     run: () =>
       runPipeline(
-        { brief, clipPaths, ratio, durationSec: duration, captionStyle, outPath },
+        { brief, reference, clipPaths, ratio, durationSec: duration, captionStyle, outPath },
         { onProgress: (stage, detail) => jobStore.markStage(id, stage, detail) },
       )
         .then((res) => {

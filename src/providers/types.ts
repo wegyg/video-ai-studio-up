@@ -37,6 +37,7 @@ export interface PlanProvider {
     ratio: EditPlan["format"]["ratio"];
     durationSec: number;
     fps: number;
+    reference?: string; // extracted homepage/notes text to tailor the promo
   }): Promise<EditPlan>;
 }
 

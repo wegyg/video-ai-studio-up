@@ -19,12 +19,13 @@ export const maxDuration = 120;
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const brief = String(form.get("brief") ?? "").trim();
+  const reference = String(form.get("reference") ?? "").trim();
   const ratio = (String(form.get("ratio") ?? "9:16") as AspectRatio) || "9:16";
   const duration = Number(form.get("duration") ?? 20) || 20;
   const captionStyle = form.get("caption_style")
     ? (String(form.get("caption_style")) as CaptionStyle)
     : undefined;
-  if (!brief) return NextResponse.json({ error: "A one-line brief is required" }, { status: 400 });
+  if (!brief) return NextResponse.json({ error: "한 줄 설명을 입력해 주세요." }, { status: 400 });
 
   const planId = crypto.randomUUID().slice(0, 12);
   const dir = jobDir(planId);
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
   try {
     const { plan, validation } = await generatePlan({
       brief,
+      reference,
       clipPaths,
       ratio,
       durationSec: duration,

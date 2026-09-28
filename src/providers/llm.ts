@@ -59,7 +59,7 @@ Rules:
 Return STRICT JSON only, matching:
 {"beats":[{"role":"hook","subtitle":"...","subtitle_emphasis":"...","narration":"...","motion":"zoom_punch","motion_text":""}],"cta_text":"...","caption":"...","hashtags":["#.."],"thumbnail_text":"...","music_mood":"...","music_bpm":100,"voice_tone":"..."}`;
 
-async function callLLM(brief: string): Promise<z.infer<typeof LlmResponse>> {
+async function callLLM(brief: string, reference?: string): Promise<z.infer<typeof LlmResponse>> {
   const { apiKey, baseUrl, model } = llmConfig();
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -73,7 +73,15 @@ async function callLLM(brief: string): Promise<z.infer<typeof LlmResponse>> {
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM },
-        { role: "user", content: `Brief: ${brief}\nReturn the JSON now.` },
+        {
+          role: "user",
+          content:
+            `Brief: ${brief}\n` +
+            (reference && reference.trim()
+              ? `Reference material (brand homepage / notes — base the copy on this, use its real terms):\n"""${reference.slice(0, 1500)}"""\n`
+              : "") +
+            `Return the JSON now.`,
+        },
       ],
     }),
     // node fetch: no timeout by default; guard with AbortController
@@ -177,7 +185,7 @@ export const llmPlanProvider: PlanProvider = {
   async generate(input) {
     const clipIds = input.clips.length ? input.clips.map((c) => c.id) : ["placeholder"];
     try {
-      const llm = await callLLM(input.brief);
+      const llm = await callLLM(input.brief, input.reference);
       return assemble(llm, {
         brief: input.brief,
         clipIds,

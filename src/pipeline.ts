@@ -20,6 +20,7 @@ import { buildNarrationTrack, muxAudio } from "./audio";
 
 export interface PipelineInput {
   brief: string;
+  reference?: string; // homepage URL or reference notes
   clipPaths: string[]; // uploaded footage (may be empty -> placeholders)
   ratio?: AspectRatio;
   durationSec?: number;
@@ -65,8 +66,25 @@ export async function generatePlan(
   const transcripts: Transcript[] = [];
   for (const c of clips) transcripts.push(await stt.transcribe(c));
 
+  // Resolve reference material (homepage URL -> page text, or notes as-is).
+  let referenceText = "";
+  if (input.reference && input.reference.trim()) {
+    log("plan", "참고 자료 분석 중");
+    const { resolveReference } = await import("./reference");
+    const ref = await resolveReference(input.reference);
+    referenceText = ref.text;
+  }
+
   log("plan", planner.name);
-  let plan = await planner.generate({ brief: input.brief, clips, transcripts, ratio, durationSec, fps });
+  let plan = await planner.generate({
+    brief: input.brief,
+    clips,
+    transcripts,
+    ratio,
+    durationSec,
+    fps,
+    reference: referenceText,
+  });
   if (input.captionStyle) plan.format.caption_style = input.captionStyle;
 
   log("validate");

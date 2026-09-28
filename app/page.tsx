@@ -6,10 +6,10 @@ import PlanEditor, { type UIPlan } from "./PlanEditor";
 type Ratio = "9:16" | "1:1" | "16:9";
 type CaptionStyle = "bold-pop" | "karaoke-bar" | "minimal" | "boxed";
 const CAPTION_STYLES: { value: CaptionStyle; label: string }[] = [
-  { value: "bold-pop", label: "Bold Pop" },
-  { value: "karaoke-bar", label: "Karaoke" },
-  { value: "minimal", label: "Minimal" },
-  { value: "boxed", label: "Boxed" },
+  { value: "bold-pop", label: "볼드 팝" },
+  { value: "karaoke-bar", label: "노래방" },
+  { value: "minimal", label: "미니멀" },
+  { value: "boxed", label: "박스" },
 ];
 type JobStatus =
   | "queued"
@@ -34,18 +34,18 @@ interface Job {
 }
 
 const RATIOS: { value: Ratio; label: string; box: string }[] = [
-  { value: "9:16", label: "9:16 Reels", box: "aspect-[9/16]" },
-  { value: "1:1", label: "1:1 Feed", box: "aspect-square" },
-  { value: "16:9", label: "16:9 YouTube", box: "aspect-video" },
+  { value: "9:16", label: "9:16 릴스", box: "aspect-[9/16]" },
+  { value: "1:1", label: "1:1 피드", box: "aspect-square" },
+  { value: "16:9", label: "16:9 유튜브", box: "aspect-video" },
 ];
 
 const STAGES: { key: JobStatus; label: string }[] = [
-  { key: "ingest", label: "Ingest" },
-  { key: "plan", label: "Plan" },
-  { key: "validate", label: "Validate" },
-  { key: "render", label: "Render" },
-  { key: "composite", label: "Composite" },
-  { key: "done", label: "Done" },
+  { key: "ingest", label: "소재 분석" },
+  { key: "plan", label: "기획" },
+  { key: "validate", label: "검수" },
+  { key: "render", label: "렌더링" },
+  { key: "composite", label: "합성" },
+  { key: "done", label: "완료" },
 ];
 
 function Spinner({ className = "h-4 w-4" }: { className?: string }) {
@@ -66,6 +66,7 @@ const BUSY_LABEL: Record<Exclude<BusyAction, null>, string> = {
 
 export default function Home() {
   const [brief, setBrief] = useState("");
+  const [reference, setReference] = useState(""); // homepage URL or reference notes
   const [ratio, setRatio] = useState<Ratio>("9:16");
   const [duration, setDuration] = useState(20);
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>("bold-pop");
@@ -126,6 +127,7 @@ export default function Home() {
   function briefForm() {
     const fd = new FormData();
     fd.append("brief", brief);
+    fd.append("reference", reference);
     fd.append("ratio", ratio);
     fd.append("duration", String(duration));
     fd.append("caption_style", captionStyle);
@@ -138,7 +140,7 @@ export default function Home() {
       id,
       status: "queued",
       progress: 0,
-      message: "Queued",
+      message: "대기 중",
       error: null,
       planSummary: null,
       videoUrl: null,
@@ -225,10 +227,10 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">🎬 ShortsDirector</h1>
+        <h1 className="text-3xl font-bold tracking-tight">🎬 숏츠디렉터</h1>
         <p className="mt-1 text-white/60">
-          Upload your footage and one line. AI plans the edit — captions, motion &amp; a CTA — and
-          renders a vertical short. <span className="text-emerald-400">Free · no API keys.</span>
+          영상과 한 줄만 넣으면 AI가 편집을 기획하고 자막·모션·CTA까지 얹어 세로형 숏츠를
+          만들어 줍니다. <span className="text-emerald-400">무료 · API 키 불필요</span>
         </p>
       </header>
 
@@ -236,7 +238,7 @@ export default function Home() {
         {/* ---- Left: inputs ---- */}
         <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 space-y-5">
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-white/70">One-line brief</span>
+            <span className="mb-1.5 block text-sm font-medium text-white/70">한 줄 설명</span>
             <input
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
@@ -245,10 +247,27 @@ export default function Home() {
             />
           </label>
 
+          {/* reference: homepage URL or notes */}
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-white/70">
+              참고 자료 <span className="text-white/40">(홈페이지 주소 또는 참고 내용, 선택)</span>
+            </span>
+            <textarea
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              rows={3}
+              placeholder={"예: https://mybrand.com  또는  브랜드 소개·강조하고 싶은 문구를 붙여넣으세요"}
+              className="w-full resize-y rounded-xl border border-white/10 bg-black/25 px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+            />
+            <span className="mt-1 block text-xs text-white/40">
+              주소를 넣으면 그 페이지 내용을 읽어 영상 대본에 반영합니다.
+            </span>
+          </label>
+
           {/* dropzone */}
           <div>
             <span className="mb-1.5 block text-sm font-medium text-white/70">
-              Your video clips <span className="text-white/40">(optional)</span>
+              내 영상 클립 <span className="text-white/40">(선택)</span>
             </span>
             <div
               onDragOver={(e) => {
@@ -266,9 +285,9 @@ export default function Home() {
               }`}
             >
               <p className="text-sm text-white/60">
-                Drag &amp; drop clips here, or{" "}
+                여기로 영상을 끌어다 놓거나{" "}
                 <label className="cursor-pointer text-accent underline">
-                  browse
+                  파일 선택
                   <input
                     type="file"
                     accept="video/*"
@@ -279,7 +298,7 @@ export default function Home() {
                 </label>
               </p>
               <p className="mt-1 text-xs text-white/40">
-                No clips? AI uses stylish placeholder backgrounds. (Google-Drive downloads work too.)
+                영상이 없어도 됩니다. AI가 감각적인 배경을 자동으로 만들어요. (구글 드라이브에서 받은 영상도 가능)
               </p>
             </div>
             {clips.length > 0 && (
@@ -304,7 +323,7 @@ export default function Home() {
 
           {/* ratio */}
           <div>
-            <span className="mb-1.5 block text-sm font-medium text-white/70">Aspect ratio</span>
+            <span className="mb-1.5 block text-sm font-medium text-white/70">화면 비율</span>
             <div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1">
               {RATIOS.map((r) => (
                 <button
@@ -322,7 +341,7 @@ export default function Home() {
 
           {/* caption style */}
           <div>
-            <span className="mb-1.5 block text-sm font-medium text-white/70">Caption style</span>
+            <span className="mb-1.5 block text-sm font-medium text-white/70">자막 스타일</span>
             <div className="inline-flex flex-wrap gap-1 rounded-xl border border-white/10 bg-black/20 p-1">
               {CAPTION_STYLES.map((c) => (
                 <button
@@ -341,7 +360,7 @@ export default function Home() {
           {/* duration */}
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-white/70">
-              Duration: {duration}s
+              영상 길이: <span translate="no" className="notranslate">{duration}초</span>
             </span>
             <input
               type="range"
@@ -358,28 +377,28 @@ export default function Home() {
               onClick={handleReviewEdit}
               disabled={busy || !brief.trim() || running}
               className="rounded-xl bg-accent py-3 font-semibold transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-40"
-              title="Generate an editable plan you can tweak before rendering"
+              title="렌더링 전에 편집할 수 있는 기획안을 만듭니다"
             >
               {busyAction === "plan" ? (
                 <span className="inline-flex items-center gap-2">
-                  <Spinner /> Working…
+                  <Spinner /> 준비 중…
                 </span>
               ) : (
-                "📝 Review & Edit"
+                "📝 기획안 보고 편집"
               )}
             </button>
             <button
               onClick={handleGenerate}
               disabled={busy || !brief.trim() || running}
               className="rounded-xl border border-white/15 py-3 font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-              title="Skip editing and render straight away"
+              title="편집 없이 바로 영상 만들기"
             >
               {busyAction === "generate" || (running && !plan) ? (
                 <span className="inline-flex items-center gap-2">
-                  <Spinner /> Generating…
+                  <Spinner /> 생성 중…
                 </span>
               ) : (
-                "⚡ Quick Generate"
+                "⚡ 바로 만들기"
               )}
             </button>
           </div>
@@ -395,17 +414,17 @@ export default function Home() {
                 >
                   {running || busyAction === "render" ? (
                     <span className="inline-flex items-center justify-center gap-2">
-                      <Spinner /> Rendering…
+                      <Spinner /> 렌더링 중…
                     </span>
                   ) : (
-                    "🎬 Render Video"
+                    "🎬 영상 만들기"
                   )}
                 </button>
                 <button
                   onClick={() => setPlan(null)}
                   className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-white/60 transition hover:bg-white/5"
                 >
-                  Discard
+                  취소
                 </button>
               </div>
             </div>
@@ -415,7 +434,7 @@ export default function Home() {
         {/* ---- Right: preview / progress ---- */}
         <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-white/50">
-            Preview
+            미리보기
           </h2>
           <div
             className={`mx-auto flex ${boxClass} w-full max-w-[300px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/40`}
@@ -437,10 +456,10 @@ export default function Home() {
                   <p translate="no" className="notranslate text-xs tabular-nums text-white/40">
                     {`${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")} 경과`}
                   </p>
-                  <p className="text-[11px] text-white/30">무료 서버라 1~3분 걸릴 수 있어요. 창을 닫지 마세요.</p>
+                  <p className="text-[11px] text-white/30">보통 30초~2분 정도 걸립니다. 창을 닫지 마세요.</p>
                 </div>
               ) : (
-                <div className="px-6 text-center text-sm text-white/40">Your short will appear here</div>
+                <div className="px-6 text-center text-sm text-white/40">완성된 숏츠가 여기에 표시됩니다</div>
               )
             )}
           </div>
@@ -477,7 +496,8 @@ export default function Home() {
               </div>
               {job.planSummary && (
                 <p className="text-xs text-white/40">
-                  Plan: {job.planSummary.scenes} scenes · {job.planSummary.duration}s
+                  기획: <span translate="no" className="notranslate">{job.planSummary.scenes}</span>개 장면 ·{" "}
+                  <span translate="no" className="notranslate">{job.planSummary.duration}초</span>
                 </p>
               )}
               {done && (
@@ -487,7 +507,7 @@ export default function Home() {
                     download
                     className="block w-full rounded-xl border border-accent py-2.5 text-center font-medium text-accent transition hover:bg-accent hover:text-white"
                   >
-                    ⬇ Download MP4
+                    ⬇ 영상 내려받기 (MP4)
                   </a>
                   {job.thumbnailUrl && (
                     <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-2">
@@ -502,7 +522,7 @@ export default function Home() {
                         download
                         className="flex-1 text-center text-sm font-medium text-white/70 hover:text-white"
                       >
-                        🖼️ Download thumbnail
+                        🖼️ 썸네일 내려받기
                       </a>
                     </div>
                   )}
@@ -512,6 +532,17 @@ export default function Home() {
           )}
         </section>
       </div>
+
+      {/* developer credit */}
+      <footer className="mt-10 border-t border-white/10 pt-5 text-center text-sm text-white/50">
+        <p>
+          개발 · <span className="font-medium text-white/70">몸의중심 이성진</span>
+          <span className="mx-2 text-white/20">|</span>
+          <a href="tel:1877-7323" className="text-accent hover:underline" translate="no">
+            1877-7323
+          </a>
+        </p>
+      </footer>
     </main>
   );
 }

@@ -83,8 +83,9 @@ export default function PlanEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-white/50">
-          Edit plan — {scenes.length} scenes · {total.toFixed(1)}s
+        <h3 className="text-sm font-semibold tracking-wide text-white/50">
+          기획안 편집 — <span translate="no" className="notranslate">{scenes.length}</span>개 장면 ·{" "}
+          <span translate="no" className="notranslate">{total.toFixed(1)}초</span>
         </h3>
       </div>
 
@@ -95,27 +96,27 @@ export default function PlanEditor({
               <span className="grid h-6 w-6 place-items-center rounded-full bg-accent/30 text-white">
                 {i + 1}
               </span>
-              {i === 0 ? "Hook" : i === scenes.length - 1 ? "CTA" : `Scene ${i + 1}`} ·{" "}
-              {(s.end - s.start).toFixed(1)}s
+              {i === 0 ? "훅(첫 장면)" : i === scenes.length - 1 ? "CTA(마무리)" : `장면 ${i + 1}`} ·{" "}
+              <span translate="no" className="notranslate">{(s.end - s.start).toFixed(1)}초</span>
             </span>
             <div className="flex items-center gap-1">
-              <IconBtn label="Up" disabled={i === 0} onClick={() => move(i, -1)}>↑</IconBtn>
-              <IconBtn label="Down" disabled={i === scenes.length - 1} onClick={() => move(i, 1)}>↓</IconBtn>
-              <IconBtn label="Delete" disabled={scenes.length <= 1} onClick={() => remove(i)}>✕</IconBtn>
+              <IconBtn label="위로" disabled={i === 0} onClick={() => move(i, -1)}>↑</IconBtn>
+              <IconBtn label="아래로" disabled={i === scenes.length - 1} onClick={() => move(i, 1)}>↓</IconBtn>
+              <IconBtn label="삭제" disabled={scenes.length <= 1} onClick={() => remove(i)}>✕</IconBtn>
             </div>
           </div>
 
           <input
             value={s.subtitle}
             onChange={(e) => updateScene(i, { subtitle: e.target.value })}
-            placeholder="On-screen caption"
+            placeholder="화면 자막"
             className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm font-medium outline-none focus:border-accent"
           />
           <div className="mb-2 flex gap-2">
             <input
               value={s.subtitle_emphasis}
               onChange={(e) => updateScene(i, { subtitle_emphasis: e.target.value })}
-              placeholder="Emphasis word"
+              placeholder="강조할 단어"
               className="w-1/2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70 outline-none focus:border-accent"
             />
             <select
@@ -133,11 +134,11 @@ export default function PlanEditor({
           <input
             value={s.narration}
             onChange={(e) => updateScene(i, { narration: e.target.value })}
-            placeholder="Narration (spoken) — optional"
+            placeholder="나레이션 (음성으로 읽을 문장) — 선택"
             className="mb-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/60 outline-none focus:border-accent"
           />
           <div className="flex items-center gap-2">
-            <span className="text-xs text-white/40">Duration</span>
+            <span className="text-xs text-white/40">길이</span>
             <input
               type="range"
               min={1}
@@ -147,7 +148,7 @@ export default function PlanEditor({
               onChange={(e) => setDuration(i, Number(e.target.value))}
               className="flex-1 accent-accent"
             />
-            <span className="w-10 text-right text-xs text-white/60">{(s.end - s.start).toFixed(1)}s</span>
+            <span translate="no" className="notranslate w-12 text-right text-xs text-white/60">{(s.end - s.start).toFixed(1)}초</span>
           </div>
         </div>
       ))}

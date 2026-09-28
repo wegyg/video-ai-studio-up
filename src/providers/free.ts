@@ -27,10 +27,18 @@ export const freeTTS: TTSProvider = {
 // derived from the one-line brief; motions are assigned per beat.
 export const freePlanProvider: PlanProvider = {
   name: "template",
-  async generate({ brief, clips, ratio, durationSec, fps }) {
+  async generate({ brief, clips, ratio, durationSec, fps, reference }) {
     const subject = brief.trim() || "우리 제품";
     const clipIds = clips.length ? clips.map((c) => c.id) : ["placeholder"];
     const pick = (i: number) => clipIds[i % clipIds.length];
+
+    // Pull short phrases from the reference (homepage/notes) to weave into the
+    // middle beats so the promo reflects the real brand copy.
+    let refPhrases: string[] = [];
+    if (reference && reference.trim()) {
+      const { referenceKeyPhrases } = require("../reference");
+      refPhrases = referenceKeyPhrases(reference, 3) as string[];
+    }
 
     // Beat definitions: label, subtitle, emphasis, narration, motion.
     const beats: Array<Omit<Scene, "start" | "end" | "source_clip" | "speed" | "sfx"> & {
@@ -86,6 +94,17 @@ export const freePlanProvider: PlanProvider = {
         sfx: [{ at: 0, type: "pop" }],
       },
     ];
+
+    // Weave reference phrases into the middle beats (indices 1..n-2) so the
+    // promo reflects the brand's own copy from the homepage/notes.
+    refPhrases.forEach((phrase, idx) => {
+      const target = beats[1 + idx];
+      if (target && phrase) {
+        target.subtitle = phrase;
+        target.subtitle_emphasis = phrase.split(/\s+/)[0] || target.subtitle_emphasis;
+        target.narration = phrase;
+      }
+    });
 
     // Time budget: hook 1.5s, CTA 2s, the rest split across middle beats,
     // each capped at 4s (validator rule 3).
