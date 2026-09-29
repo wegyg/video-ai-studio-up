@@ -5,17 +5,20 @@
 
 ## 결과
 
-| 항목 | 샌드박스 (Linux, Chrome 154, 헤드리스, GPU 없음) | CI (ubuntu-latest, Chrome) |
+| 항목 | 샌드박스 (Linux, Chrome 154, 헤드리스, GPU 없음) | CI (ubuntu-latest, Chrome 153, 헤드리스) |
 |------|------------------------------|----------------------------|
-| 보안 컨텍스트 / WebCodecs | ✓ / ✓ | 태스크 2.5에서 기록 |
-| H.264 인코딩 1080×1920 30fps | ✓ (소프트웨어) | |
-| H.264 인코딩, 하드웨어 선호 | ✗ (GPU 없음) | |
-| AAC 네이티브 인코딩 | ✗ → WASM 확장 사용 | |
-| H.264 mp4 디코딩 (Mediabunny) | ✓, 2.5초 픽셀 = 파랑 (0,14,253) | |
-| 인코딩 속도 (단순 화면 60프레임) | 697ms = **86fps** | |
-| 출력 MP4 | avc + aac, 1080×1920, 2.027초 | |
-| 글꼴 (Pretendard, Noto Sans KR × 400/700/900) | 6개 모두 로드 | |
-| File System Access API | ✓ (`showSaveFilePicker`) | |
+| 보안 컨텍스트 / WebCodecs | ✓ / ✓ | ✓ / ✓ |
+| H.264 인코딩 1080×1920 30fps | ✓ (소프트웨어) | ✓ (소프트웨어) |
+| H.264 인코딩, 하드웨어 선호 | ✗ (GPU 없음) | ✗ (GPU 없음) |
+| AAC 네이티브 인코딩 | ✗ → WASM 확장 사용 | ✗ → WASM 확장 사용 |
+| H.264 mp4 디코딩 (Mediabunny) | ✓, 2.5초 픽셀 = 파랑 (0,14,253) | ✓, (0,14,253) |
+| 인코딩 속도 (단순 화면 60프레임) | 697ms = **86fps** | 1299ms = **46fps** (러너 2코어) |
+| 출력 MP4 | avc + aac, 1080×1920, 2.027초 | 같음 |
+| 글꼴 (Pretendard, Noto Sans KR × 400/700/900) | 6개 모두 로드 | 6개 모두 로드 |
+| File System Access API | ✓ (`showSaveFilePicker`) | ✓ |
+
+배포본(https://wegyg.github.io/video-ai-studio-up/)에서도 같은 스파이크를 샌드박스 Chrome으로 다시 실행해 통과했다(`tests/e2e/deployed.spec.ts`).
+CI 속도가 샌드박스의 절반이므로, A2(60초 영상 60초 이내)는 CI 시간으로 판단하지 않는다. 사용자 노트북(하드웨어 인코더)에서 측정한다.
 
 ## 결론과 설계 반영
 - **1단계 경로는 Linux Chrome에서 그대로 동작한다.** H.264는 소프트웨어 인코더로 인코딩되고, AAC는 네이티브가 없어 `@mediabunny/aac-encoder`(WASM)로 대체된다. 이 확장은 약 1MB라 `canEncodeAudio('aac')`가 false일 때만 동적으로 불러온다. Windows Chrome은 OS 인코더(Media Foundation)를 써서 네이티브 AAC가 될 것으로 예상하지만, 샌드박스에서는 확인할 수 없다. 사용자 확인 2에서 확인한다.
