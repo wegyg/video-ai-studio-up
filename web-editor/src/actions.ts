@@ -3,7 +3,7 @@
  */
 import { ko } from './i18n/ko';
 import { toast } from './ui/toasts';
-import { clipEnd, createMediaClip, createShapeClip, createTextClip, DEFAULT_TRANSFORM, defaultTrackFor, findClip, isMedia, trackKindFor } from './model/ops';
+import { clipEnd, createMediaClip, createShapeClip, createTextClip, DEFAULT_TRANSFORM, defaultTrackFor, findClip, isMedia, newId, trackKindFor } from './model/ops';
 import { NEUTRAL_ADJUST, presetFilter } from './model/filters';
 import { keyOffsets, setEaseAt, setValues, toggleKeys, TRANSFORM_PROPS } from './model/keyframes';
 import {
@@ -270,6 +270,45 @@ export const actions = {
   },
   setKeepPitch(clipId: string, keep: boolean): void {
     useProject.getState().updateClip(clipId, (c) => (!isMedia(c) || (c.keepPitch !== false) === keep ? c : { ...c, keepPitch: keep }));
+  },
+  /**
+   * 오디오 분리 (R19): 영상 클립의 소리를 같은 구간의 오디오 트랙 클립으로 떼어 내고, 영상 클립은 소리를 끈다.
+   * 빈 오디오 트랙이 없으면 만든다. 두 변경을 합쳐 실행 취소 1번으로 되돌린다.
+   */
+  detachAudio(clipId: string): string | null {
+    const p = useProject.getState();
+    const loc = findClip(p.edit, clipId);
+    if (!loc || loc.clip.type !== 'video' || loc.clip.audioDetached || !p.assets[loc.clip.assetId]?.hasAudio) return null;
+    const c = loc.clip;
+    const end = c.start + c.duration;
+    const free = (t: Track) => t.kind === 'audio' && t.clips.every((o) => o.start >= end || o.start + o.duration <= c.start);
+    history.beginGesture();
+    let track = useProject.getState().edit.tracks.find(free);
+    if (!track) {
+      useProject.getState().addTrack('audio');
+      track = [...useProject.getState().edit.tracks].reverse().find(free);
+    }
+    const audio: MediaClip = { ...c, id: newId('clip'), type: 'audio', transform: { ...DEFAULT_TRANSFORM } };
+    delete audio.transitionIn;
+    delete audio.filter;
+    delete audio.audioDetached;
+    delete audio.keyframes;
+    if (c.keyframes?.volume?.length) audio.keyframes = { volume: c.keyframes.volume }; // 소리 키프레임만 가져간다
+    const id = track ? useProject.getState().addClip(track.id, audio) : null;
+    if (id) useProject.getState().updateClip(c.id, (x) => ({ ...x, audioDetached: true }) as Clip);
+    history.endGesture();
+    if (id) useUI.getState().select(id);
+    return id;
+  },
+  /** 자동 덕킹 켜기(줄인 크기 0~1) / 끄기(undefined) — 오디오 클립 */
+  setDuck(clipId: string, duck: number | undefined): void {
+    useProject.getState().updateClip(clipId, (c) => {
+      if (c.type !== 'audio' || c.duck === duck) return c;
+      const next: MediaClip = { ...c };
+      if (duck === undefined) delete next.duck;
+      else next.duck = Math.max(0, Math.min(1, duck));
+      return next;
+    });
   },
   /** 화면 배치 초기화: 배치 키프레임도 지운다 */
   resetTransform(clipId: string): void {

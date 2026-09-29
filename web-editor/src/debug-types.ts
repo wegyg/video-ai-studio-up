@@ -40,6 +40,8 @@ export interface DebugState {
         fadeOut?: number;
         speed?: number;
         keepPitch?: boolean;
+        duck?: number;
+        audioDetached?: boolean;
         transform?: { x: number; y: number; scale: number; rotation: number; opacity: number };
         // 텍스트 클립
         text?: string;

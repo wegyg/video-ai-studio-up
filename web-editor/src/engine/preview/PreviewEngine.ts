@@ -21,6 +21,7 @@ import { sharedEffects } from '../gl/effects';
 import { needsEffects } from '../../model/filters';
 import { sourceFrame, srcAt, visibleRange } from '../../model/transitions';
 import { transformAt } from '../../model/keyframes';
+import { duckEnvelope, duckFactor } from '../../model/ducking';
 import { clipBox, containsPoint, textBox, type Box, type Point } from '../geometry';
 import { drawTextClip, layoutText } from '../text';
 import { ensureFont, isFontLoaded, type FontFamily, type FontWeight } from '../../fonts';
@@ -406,7 +407,8 @@ export class PreviewEngine {
         else if (a < CALM_DRIFT * speed) s.setRate(speed);
         if (performance.now() - s.playStartedAt > 800) this.drifts.push({ t: performance.now(), d: a });
       }
-      if (s.audio && this.audio) s.audio.gain.gain.setTargetAtTime(muted || !active ? 0 : gainAt(clip, frame), this.audio.ctx.currentTime, 0.015);
+      const silent = muted || !active || (clip.type === 'video' && clip.audioDetached);
+      if (s.audio && this.audio) s.audio.gain.gain.setTargetAtTime(silent ? 0 : gainAt(clip, frame) * duckFactor(clip, this.duckEnv(), frame), this.audio.ctx.currentTime, 0.015);
     } else {
       if (!s.el.paused) {
         s.el.pause();
@@ -416,6 +418,18 @@ export class PreviewEngine {
       s.seekTo(frameSrc + SEEK_EPS);
       if (s.audio && this.audio && this.playing) s.audio.gain.gain.setTargetAtTime(0, this.audio.ctx.currentTime, 0.01);
     }
+  }
+
+  private duckCache: { edit: EditState; entries: unknown; assets: unknown; env: Float32Array | null } | null = null;
+  /** 자동 덕킹 곡선 (편집·파형이 바뀔 때만 다시 계산). 내보내기와 같은 함수 (model/ducking.ts) */
+  private duckEnv(): Float32Array | null {
+    const { edit, assets } = useProject.getState();
+    const entries = useMedia.getState().entries;
+    const c = this.duckCache;
+    if (c && c.edit === edit && c.entries === entries && c.assets === assets) return c.env;
+    const env = duckEnvelope(edit, assets, (id) => entries[id]?.peaks, editDuration(edit));
+    this.duckCache = { edit, entries, assets, env };
+    return env;
   }
 
   /** 재생 시작: 지금 보이는 미디어가 실제로 움직이기 시작하면(또는 잠시 기다린 뒤) 시계를 켠다 */

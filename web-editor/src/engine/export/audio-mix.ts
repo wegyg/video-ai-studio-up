@@ -11,6 +11,8 @@
 import { ALL_FORMATS, AudioBufferSink, BlobSource, Input, type InputAudioTrack } from 'mediabunny';
 import { gainAt } from '../../model/audio';
 import { timeStretch } from './time-stretch';
+import { duckEnvelope, duckFactor } from '../../model/ducking';
+import { useMedia } from '../../media/store';
 import { isMedia } from '../../model/ops';
 import { FPS, type AssetMeta, type EditState, type MediaClip } from '../../model/types';
 import type { ExportAudio } from './protocol';
@@ -61,6 +63,7 @@ function collect(edit: EditState, assets: Record<string, AssetMeta>): MediaClip[
     for (const clip of track.clips) {
       if (!isMedia(clip) || clip.type === 'image') continue;
       if (!assets[clip.assetId]?.hasAudio) continue;
+      if (clip.type === 'video' && clip.audioDetached) continue; // 소리를 오디오 트랙으로 분리한 영상
       out.push(clip);
     }
   }
@@ -77,6 +80,9 @@ export async function mixExportAudio(
   const clips = collect(edit, assets);
   if (!clips.length || totalFrames <= 0) return null;
 
+  // 자동 덕킹: 미리보기와 같은 파형 자료·같은 함수로 곡선을 만든다 (model/ducking.ts)
+  const entries = useMedia.getState().entries;
+  const env = duckEnvelope(edit, assets, (id) => entries[id]?.peaks, totalFrames);
   const length = Math.ceil((totalFrames / FPS) * EXPORT_SAMPLE_RATE);
   const ctx = new OfflineAudioContext(2, length, EXPORT_SAMPLE_RATE);
   const inputs = new Map<string, Input>();
@@ -115,8 +121,9 @@ export async function mixExportAudio(
       const playedSec = buf.duration / (buf === raw ? speed : 1);
       // 프레임마다 선형으로 이어 붙이면 gainAt 곡선과 프레임 경계에서 정확히 같아진다
       const endFrame = clip.start + Math.min(clip.duration, Math.round(playedSec * FPS));
-      gain.gain.setValueAtTime(gainAt(clip, clip.start), startSec);
-      for (let f = clip.start + 1; f <= endFrame; f++) gain.gain.linearRampToValueAtTime(gainAt(clip, f), f / FPS);
+      const g = (f: number) => gainAt(clip, f) * duckFactor(clip, env, f);
+      gain.gain.setValueAtTime(g(clip.start), startSec);
+      for (let f = clip.start + 1; f <= endFrame; f++) gain.gain.linearRampToValueAtTime(g(f), f / FPS);
       src.connect(gain).connect(ctx.destination);
       src.start(startSec);
       placed++;

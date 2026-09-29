@@ -131,12 +131,14 @@ function ClipCanvas({ clip, width, height }: { clip: MediaClip; width: number; h
     const e = peaks ? Math.min(srcAt(clip, clip.start + (visL + w) / ppf) / FPS, peaks.length / PEAKS_PER_SEC + 1) : 0;
     if (clip.type === 'video') {
       // 소리가 있는 영상: 위 = 필름스트립, 아래 띠 = 파형 (R4.3)
-      const waveH = peaks ? Math.round(height * VIDEO_WAVE_RATIO) : 0;
+      // 소리를 분리한 영상은 파형 띠를 그리지 않는다 (소리는 오디오 트랙 클립에 있다)
+      const wave = clip.audioDetached ? undefined : peaks;
+      const waveH = wave ? Math.round(height * VIDEO_WAVE_RATIO) : 0;
       if (entry?.filmstrip) drawFilmstrip(ctx, entry.filmstrip, clip, ppf, visL, w, height - waveH);
-      if (peaks) {
+      if (wave) {
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(0, height - waveH, w, waveH);
-        drawPeaks(ctx, peaks, s, e, 0, height - waveH + 1, w, waveH - 2, '#5eead4');
+        drawPeaks(ctx, wave, s, e, 0, height - waveH + 1, w, waveH - 2, '#5eead4');
       }
     }
     if (clip.type === 'audio' && peaks) drawPeaks(ctx, peaks, s, e, 0, 4, w, height - 8, '#7dd3fc');

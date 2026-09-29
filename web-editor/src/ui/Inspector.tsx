@@ -4,6 +4,7 @@
  */
 import { actions } from '../actions';
 import { ko } from '../i18n/ko';
+import { DUCK_DEFAULT } from '../model/ducking';
 import { hasAnyKeys, hasKeys, propsKeyedAt, transformAt, valueAt } from '../model/keyframes';
 import { findClip, isMedia, SPEED_MAX, SPEED_MIN } from '../model/ops';
 import { FPS, type Clip, type Easing, type KeyProp, type MediaClip, type Transform } from '../model/types';
@@ -188,7 +189,12 @@ function AudioFields({ clip, visible }: { clip: MediaClip; visible: boolean }) {
   return (
     <Section title={ko.inspector.sectionAudio}>
       {!hasAudio && <p className="text-xs text-neutral-500">{ko.inspector.noAudio}</p>}
-      <Keyed button={<KeyButton clip={clip} props={['volume']} label={ko.inspector.volume} enabled={visible && hasAudio} />}>
+      {clip.type === 'video' && hasAudio && clip.audioDetached && (
+        <p data-testid="audio-detached" className="text-xs leading-relaxed text-neutral-400">
+          {ko.inspector.audioDetached}
+        </p>
+      )}
+      <Keyed button={<KeyButton clip={clip} props={['volume']} label={ko.inspector.volume} enabled={visible && hasAudio && !clip.audioDetached} />}>
         <SliderField
           label={ko.inspector.volume}
           testId="prop-volume"
@@ -198,7 +204,7 @@ function AudioFields({ clip, visible }: { clip: MediaClip; visible: boolean }) {
           unit={ko.inspector.units.percent}
           toView={(v) => v * 100}
           fromView={(v) => v / 100}
-          disabled={!hasAudio}
+          disabled={!hasAudio || !!clip.audioDetached}
           onCommit={(volume) => actions.setValuesAt(clip.id, { volume })}
         />
       </Keyed>
@@ -228,6 +234,47 @@ function AudioFields({ clip, visible }: { clip: MediaClip; visible: boolean }) {
         disabled={!hasAudio}
         onCommit={(fadeOut) => set({ fadeOut })}
       />
+      {clip.type === 'video' && hasAudio && !clip.audioDetached && (
+        <div className="flex flex-col gap-1">
+          <button
+            type="button"
+            data-testid="detach-audio"
+            onClick={() => actions.detachAudio(clip.id)}
+            className="self-start rounded-md bg-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-700"
+          >
+            {ko.inspector.detachAudio}
+          </button>
+          <p className="text-[11px] leading-relaxed text-neutral-500">{ko.inspector.detachHint}</p>
+        </div>
+      )}
+      {clip.type === 'audio' && (
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-xs text-neutral-300">
+            <input
+              type="checkbox"
+              data-testid="prop-duck"
+              checked={clip.duck !== undefined}
+              onChange={(e) => actions.setDuck(clip.id, e.target.checked ? DUCK_DEFAULT : undefined)}
+              className="accent-cyan-400"
+            />
+            {ko.inspector.duck}
+          </label>
+          {clip.duck !== undefined && (
+            <SliderField
+              label={ko.inspector.duckLevel}
+              testId="prop-duck-level"
+              value={clip.duck}
+              min={0}
+              max={1}
+              unit={ko.inspector.units.percent}
+              toView={(v) => v * 100}
+              fromView={(v) => v / 100}
+              onCommit={(v) => actions.setDuck(clip.id, v)}
+            />
+          )}
+          <p className="text-[11px] leading-relaxed text-neutral-500">{ko.inspector.duckHint}</p>
+        </div>
+      )}
     </Section>
   );
 }

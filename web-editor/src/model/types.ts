@@ -131,6 +131,10 @@ export interface MediaClip extends ClipBase {
   speed: number;
   /** 속도를 바꿔도 음 높이 유지 (없으면 유지) */
   keepPitch?: boolean;
+  /** 자동 덕킹 (오디오 클립, R19): 다른 소리가 나오는 동안의 소리 크기(0~1). 없으면 덕킹 안 함 */
+  duck?: number;
+  /** 영상 클립: 소리를 오디오 트랙으로 분리했다 (이 클립 자체는 소리를 내지 않는다, R19) */
+  audioDetached?: boolean;
   /** 오디오 클립은 사용하지 않음 */
   transform: Transform;
 }
