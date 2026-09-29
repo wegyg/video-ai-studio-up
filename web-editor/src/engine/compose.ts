@@ -16,8 +16,8 @@ export interface VisualSource {
 export interface FrameSources {
   /** 영상/이미지 클립의 이 프레임 그림 (준비 안 됐으면 null) */
   visual(clip: MediaClip, frame: number): VisualSource | null;
-  /** 텍스트 그리기 (태스크 7에서 연결) */
-  text?(ctx: Ctx2D, clip: TextClip, width: number, height: number): void;
+  /** 텍스트 클립 그리기 */
+  text?(ctx: Ctx2D, clip: TextClip, frame: number): void;
 }
 
 /** 이 프레임에 걸린 클립 (start ≤ frame < end) */
@@ -62,7 +62,7 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
     const text = edit.tracks.filter((t) => t.kind === 'text');
     for (let i = text.length - 1; i >= 0; i--) {
       const c = clipAt(text[i], frame);
-      if (c?.type === 'text') sources.text(ctx, c, W, H);
+      if (c?.type === 'text') sources.text(ctx, c, frame);
     }
   }
   ctx.restore();

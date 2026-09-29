@@ -32,6 +32,13 @@ export function clipBox(srcW: number, srcH: number, t: Transform, W: number, H: 
   return { cx: W / 2 + t.x, cy: H / 2 + t.y, w: w * t.scale, h: h * t.scale, rotation: t.rotation };
 }
 
+/**
+ * 텍스트 사각형. 글자 배치 결과가 이미 프로젝트 좌표 크기라서 맞춤 계산을 하지 않는다.
+ */
+export function textBox(layoutW: number, layoutH: number, t: Transform, W: number, H: number): Box {
+  return { cx: W / 2 + t.x, cy: H / 2 + t.y, w: layoutW * t.scale, h: layoutH * t.scale, rotation: t.rotation };
+}
+
 /** 화면 좌표 → 사각형 기준 좌표(회전을 되돌린 좌표) */
 export function toLocal(p: Point, box: Box): Point {
   const dx = p.x - box.cx;

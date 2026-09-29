@@ -1,8 +1,9 @@
 /**
  * 사용자 명령 (단축키, 툴바 버튼이 함께 쓴다).
  */
-import { clipEnd, createMediaClip, defaultTrackFor, findClip, trackKindFor } from './model/ops';
-import type { Clip, EditState, Ratio } from './model/types';
+import { ko } from './i18n/ko';
+import { clipEnd, createMediaClip, createTextClip, defaultTrackFor, findClip, trackKindFor } from './model/ops';
+import type { Clip, EditState, Ratio, TextStyle } from './model/types';
 import { history } from './store/history';
 import { useProject } from './store/project';
 import { useUI } from './store/ui';
@@ -68,6 +69,28 @@ export const actions = {
   },
   setRatio(ratio: Ratio): void {
     useProject.getState().setRatio(ratio);
+  },
+  /** 텍스트 클립 추가 (R7.1). 첫 텍스트 트랙의 플레이헤드 위치에 넣고 선택한다 */
+  addTextClip(style?: TextStyle): string | null {
+    const p = useProject.getState();
+    const track = defaultTrackFor(p.edit, 'text');
+    if (!track) return null;
+    const id = p.addClip(track.id, createTextClip(useUI.getState().playhead, ko.text.defaultContent, style));
+    if (id) useUI.getState().select(id);
+    return id;
+  },
+  /**
+   * 스타일 프리셋 적용 (R7.6). 텍스트 클립이 선택돼 있으면 그 클립에, 없으면 새로 만든다.
+   * 글자 내용·시간·위치는 건드리지 않는다.
+   */
+  applyTextPreset(style: TextStyle): string | null {
+    const selected = useUI.getState().selectedClipId;
+    const loc = selected ? findClip(useProject.getState().edit, selected) : null;
+    if (loc && loc.clip.type === 'text') {
+      useProject.getState().updateClip(loc.clip.id, (c) => ({ ...c, ...structuredClone(style) }));
+      return loc.clip.id;
+    }
+    return actions.addTextClip(style);
   },
   /**
    * 미디어를 타임라인에 넣는다 (R4.5). 트랙을 주지 않으면 기본 트랙(영상/이미지 → 메인 영상 트랙),

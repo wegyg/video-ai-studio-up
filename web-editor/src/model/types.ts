@@ -68,18 +68,69 @@ export interface MediaClip extends ClipBase {
 
 export type TextFont = 'Pretendard' | 'Noto Sans KR';
 export type TextWeight = 400 | 700 | 900;
+export type TextAlign = 'left' | 'center' | 'right';
 
-export interface TextClip extends ClipBase {
-  type: 'text';
-  text: string;
+/** 등장·퇴장 애니메이션 종류 (R7.7). 슬라이드는 방향별로 하나씩. */
+export type TextAnimType =
+  | 'none'
+  | 'fade'
+  | 'pop'
+  | 'typewriter'
+  | 'slideUp'
+  | 'slideDown'
+  | 'slideLeft'
+  | 'slideRight'
+  | 'bounce'
+  | 'zoom';
+
+export interface TextAnim {
+  type: TextAnimType;
+  /** 길이(프레임) */
+  duration: number;
+}
+
+export interface TextStroke {
+  color: string;
+  /** 두께(px, 프로젝트 해상도 기준). 0이면 없음 */
+  width: number;
+}
+
+export interface TextBox {
+  enabled: boolean;
+  color: string;
+  opacity: number;
+  padding: number;
+  radius: number;
+}
+
+export interface TextShadow {
+  enabled: boolean;
+  color: string;
+  blur: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+/** 프리셋으로 한 번에 바꾸는 서식 값 (R7.6) */
+export interface TextStyle {
   font: TextFont;
   /** 글자 크기(px, 프로젝트 해상도 기준) */
   size: number;
   weight: TextWeight;
   color: string;
-  align: 'left' | 'center' | 'right';
-  stroke: { color: string; width: number };
-  box: { enabled: boolean; color: string; opacity: number; padding: number };
+  align: TextAlign;
+  /** 줄 간격 배수 */
+  lineHeight: number;
+  stroke: TextStroke;
+  box: TextBox;
+  shadow: TextShadow;
+}
+
+export interface TextClip extends ClipBase, TextStyle {
+  type: 'text';
+  text: string;
+  animIn: TextAnim;
+  animOut: TextAnim;
   transform: Transform;
 }
 

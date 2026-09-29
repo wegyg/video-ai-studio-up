@@ -7,7 +7,7 @@ import { RATIO_SIZE, RATIOS } from '../model/types';
 import { useProject } from '../store/project';
 import { useUI } from '../store/ui';
 import { IconButton } from './common';
-import { IconPause, IconPlay } from './icons';
+import { IconFrame, IconPause, IconPlay } from './icons';
 import { SelectionOverlay } from './preview/SelectionOverlay';
 
 /** 무대 크기 안에 프로젝트 비율 그대로 들어가는 최대 크기 */
@@ -54,6 +54,22 @@ function RatioSwitch() {
         </button>
       ))}
     </div>
+  );
+}
+
+function SafeAreaToggle() {
+  const on = useUI((s) => s.safeArea);
+  return (
+    <IconButton
+      label={ko.safeArea.toggle}
+      tooltip={ko.safeArea.tooltip}
+      pressed={on}
+      onClick={() => useUI.getState().setSafeArea(!on)}
+      testId="safe-area-toggle"
+    >
+      <IconFrame />
+      <span className="text-xs">{ko.safeArea.toggle}</span>
+    </IconButton>
   );
 }
 
@@ -110,8 +126,9 @@ export function Preview() {
   const canvasRef = usePreviewEngine(box);
   return (
     <section aria-label={ko.preview.region} className="flex min-w-0 flex-1 flex-col bg-neutral-950">
-      <div className="flex h-10 shrink-0 items-center justify-center">
+      <div className="flex h-10 shrink-0 items-center justify-center gap-2">
         <RatioSwitch />
+        <SafeAreaToggle />
       </div>
       <div ref={stageRef} className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3">
         <div

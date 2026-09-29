@@ -9,6 +9,7 @@ import { FPS, type Clip, type MediaClip, type Transform } from '../model/types';
 import { useProject } from '../store/project';
 import { useUI } from '../store/ui';
 import { NumberField, SliderField } from './fields';
+import { TextProps } from './TextProps';
 
 const FADE_MAX = 5 * FPS;
 
@@ -179,6 +180,7 @@ export function Inspector() {
           </div>
           {!visible && <p className="px-3 pt-2 text-xs text-neutral-500">{ko.inspector.offscreen}</p>}
           {trackKind !== 'audio' && <TransformFields clip={clip} />}
+          {clip.type === 'text' && <TextProps clip={clip} />}
           {isMedia(clip) && <AudioFields clip={clip} />}
         </>
       )}

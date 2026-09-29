@@ -124,3 +124,11 @@ export const IconImage = (p: P) => (
     <path d="m21 15-5-5L5 21" />
   </Svg>
 );
+
+
+export const IconFrame = (p: P) => (
+  <Svg {...p}>
+    <rect x="4" y="3" width="16" height="18" rx="2" />
+    <path d="M4 7.5h16M4 16.5h16" strokeDasharray="3 2" />
+  </Svg>
+);

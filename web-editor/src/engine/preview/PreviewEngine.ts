@@ -17,7 +17,9 @@ import { FPS, RATIO_SIZE, type Clip, type EditState, type MediaClip } from '../.
 import { useProject } from '../../store/project';
 import { useUI } from '../../store/ui';
 import { clipAt, drawFrame, type FrameSources } from '../compose';
-import { clipBox, containsPoint, type Box, type Point } from '../geometry';
+import { clipBox, containsPoint, textBox, type Box, type Point } from '../geometry';
+import { drawTextClip, layoutText } from '../text';
+import { ensureFont, type FontFamily, type FontWeight } from '../../fonts';
 
 const PRELOAD = 2 * FPS;
 const KEEP = FPS;
@@ -161,6 +163,8 @@ export class PreviewEngine {
   private ready = false;
   private draws: number[] = [];
   private drifts: { t: number; d: number }[] = [];
+  private fontsReady = new Set<string>();
+  private fontsLoading = new Set<string>();
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
@@ -386,6 +390,26 @@ export class PreviewEngine {
     for (const s of active) s.playStartedAt = performance.now();
   }
 
+  /** 텍스트 글꼴이 준비됐는지. 아직이면 불러오기를 시작하고 false */
+  private ensureTextFont(family: FontFamily, weight: FontWeight): boolean {
+    const key = `${family}:${weight}`;
+    if (this.fontsReady.has(key)) return true;
+    if (!this.fontsLoading.has(key)) {
+      this.fontsLoading.add(key);
+      ensureFont(family, weight).then(
+        () => {
+          this.fontsReady.add(key);
+          this.invalidate();
+        },
+        () => {
+          this.fontsReady.add(key); // 실패해도 기본 글꼴로 그린다 (영원히 빈 화면이 되지 않게)
+          this.invalidate();
+        },
+      );
+    }
+    return false;
+  }
+
   private image(assetId: string): ImageBitmap | null {
     const v = this.images.get(assetId);
     if (v instanceof ImageBitmap) return v;
@@ -415,6 +439,14 @@ export class PreviewEngine {
     let ready = true;
     const f = Math.floor(frame);
     const sources: FrameSources = {
+      text: (c, clip) => {
+        // 글꼴이 아직 안 올라왔으면 그리지 않고, 올라오면 다시 그린다 (다른 글꼴로 잘못 보이지 않게)
+        if (!this.ensureTextFont(clip.font, clip.weight)) {
+          ready = false;
+          return;
+        }
+        drawTextClip(c, clip, RATIO_SIZE[edit.ratio].width, RATIO_SIZE[edit.ratio].height, frame);
+      },
       visual: (clip) => {
         if (clip.type === 'image') {
           const b = this.image(clip.assetId);
@@ -451,7 +483,7 @@ export class PreviewEngine {
       const v = this.slots.get(clip.id)?.el as HTMLVideoElement | undefined;
       return v && v.videoWidth > 0 ? { width: v.videoWidth, height: v.videoHeight } : null;
     }
-    return null; // audio: 화면 없음 / text: 태스크 7에서 연결
+    return null; // audio: 화면 없음 / text: 크기는 layoutText로 따로 구한다
   }
 
   /** 지금 플레이헤드에서 이 클립이 놓인 사각형 (화면에 없으면 null) */
@@ -462,9 +494,14 @@ export class PreviewEngine {
     if (!loc || loc.track.kind === 'audio') return null;
     const c = loc.clip;
     if (frame < c.start || frame >= c.start + c.duration) return null;
+    const { width: W, height: H } = RATIO_SIZE[edit.ratio];
+    if (c.type === 'text') {
+      // 텍스트는 글자 배치 결과가 곧 크기다 (맞춤 계산을 하지 않는다)
+      const l = layoutText(c, W, H);
+      return textBox(l.width, l.height, c.transform, W, H);
+    }
     const size = this.sourceSize(c);
     if (!size) return null;
-    const { width: W, height: H } = RATIO_SIZE[edit.ratio];
     return clipBox(size.width, size.height, c.transform, W, H);
   }
 

@@ -3,6 +3,7 @@ import { ko } from '../i18n/ko';
 import { type LeftTab, useUI } from '../store/ui';
 import { IconFilm, IconMusic, IconSparkles, IconType } from './icons';
 import { MediaPanel } from './MediaPanel';
+import { TextPanel } from './TextPanel';
 
 const TABS: { id: LeftTab; label: string; icon: ReactNode }[] = [
   { id: 'media', label: ko.tabs.media, icon: <IconFilm /> },
@@ -20,7 +21,7 @@ function TabContent({ tab }: { tab: LeftTab }) {
     case 'media':
       return <MediaPanel />;
     case 'text':
-      return <Note>{ko.textPanel.pending}</Note>;
+      return <TextPanel />;
     case 'audio':
       return <MediaPanel audioOnly />;
     case 'effects':

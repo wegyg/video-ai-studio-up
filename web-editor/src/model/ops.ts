@@ -2,6 +2,7 @@
  * 편집 연산 (순수 함수). 입력 EditState를 바꾸지 않고 새 상태를 돌려준다.
  * 아무것도 바뀌지 않으면 **같은 객체**를 돌려준다 → 실행 취소 기록에 빈 항목이 생기지 않는다.
  */
+import { TEXT_STYLE_BASE } from './text-presets';
 import {
   FPS,
   type AssetMeta,
@@ -10,6 +11,7 @@ import {
   type MediaClip,
   type Ratio,
   type TextClip,
+  type TextStyle,
   type Track,
   type TrackKind,
   type Transform,
@@ -64,20 +66,19 @@ export function createMediaClip(asset: AssetMeta, start: number): MediaClip {
   };
 }
 
-export function createTextClip(start: number, text: string): TextClip {
+/** 기본 등장·퇴장 애니메이션 길이(프레임) */
+export const TEXT_ANIM_FRAMES = 12;
+
+export function createTextClip(start: number, text: string, style: TextStyle = TEXT_STYLE_BASE): TextClip {
   return {
     id: newId('clip'),
     type: 'text',
     start: Math.max(0, Math.round(start)),
     duration: TEXT_DEFAULT_FRAMES,
     text,
-    font: 'Pretendard',
-    size: 96,
-    weight: 700,
-    color: '#ffffff',
-    align: 'center',
-    stroke: { color: '#000000', width: 0 },
-    box: { enabled: false, color: '#000000', opacity: 0.6, padding: 24 },
+    ...structuredClone(style),
+    animIn: { type: 'fade', duration: TEXT_ANIM_FRAMES },
+    animOut: { type: 'fade', duration: TEXT_ANIM_FRAMES },
     transform: { ...DEFAULT_TRANSFORM },
   };
 }

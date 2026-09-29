@@ -4,13 +4,14 @@
  * - 드래그 한 번 = 실행 취소 기록 1개, Esc로 취소
  * - 상자 위치는 rAF로 직접 갱신한다(React 재렌더링 없이 영상 로딩·플레이헤드 변화를 따라감)
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { actions } from '../../actions';
 import { previewRef } from '../../engine/preview/PreviewEngine';
+import { SAFE_AREA } from '../../engine/text';
 import { CORNERS, normalizeAngle, rotationFromPointer, scaleFromCorner, snapAngle, type HandleId, type Point } from '../../engine/geometry';
 import { ko } from '../../i18n/ko';
 import { findClip } from '../../model/ops';
-import { RATIO_SIZE, type Transform } from '../../model/types';
+import { RATIO_SIZE, type TextClip, type Transform } from '../../model/types';
 import { history } from '../../store/history';
 import { useProject } from '../../store/project';
 import { useUI } from '../../store/ui';
@@ -28,9 +29,58 @@ const round = (v: number, digits = 0) => {
   return Math.round(v * k) / k;
 };
 
+/** 쇼츠 UI에 가려지는 영역 안내선 (R7.9). 화면에만 그리고 내보낸 영상에는 들어가지 않는다 */
+function SafeAreaGuides() {
+  const on = useUI((s) => s.safeArea);
+  if (!on) return null;
+  const pct = (v: number) => `${v * 100}%`;
+  return (
+    <div data-testid="safe-area" className="pointer-events-none absolute inset-0">
+      <div className="absolute inset-x-0 top-0 border-b border-dashed border-amber-400/70 bg-amber-400/10" style={{ height: pct(SAFE_AREA.top) }} />
+      <div className="absolute inset-x-0 bottom-0 border-t border-dashed border-amber-400/70 bg-amber-400/10" style={{ height: pct(SAFE_AREA.bottom) }} />
+      <div className="absolute inset-y-0 left-0 border-r border-dashed border-amber-400/40" style={{ width: pct(SAFE_AREA.side) }} />
+      <div className="absolute inset-y-0 right-0 border-l border-dashed border-amber-400/40" style={{ width: pct(SAFE_AREA.side) }} />
+    </div>
+  );
+}
+
+/** 미리보기에서 두 번 눌러 글자를 바로 고치기 (R7.5) */
+function InlineEditor({ clip, onDone }: { clip: TextClip; onDone: () => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }, []);
+  const commit = (save: boolean) => {
+    const v = ref.current?.value ?? '';
+    if (save && v !== clip.text) useProject.getState().updateClip(clip.id, (c) => ({ ...c, text: v }) as typeof c);
+    onDone();
+  };
+  return (
+    <textarea
+      ref={ref}
+      data-testid="inline-text-editor"
+      aria-label={ko.textProps.content}
+      defaultValue={clip.text}
+      onBlur={() => commit(true)}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Escape') commit(false);
+        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) commit(true);
+      }}
+      className="pointer-events-auto absolute inset-0 size-full resize-none rounded bg-black/70 p-1 text-center text-white outline-2 outline-cyan-300"
+      style={{ fontSize: 16 }}
+    />
+  );
+}
+
 export function SelectionOverlay() {
   const rootRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editingClip = useProject((s) => (editingId ? (findClip(s.edit, editingId)?.clip ?? null) : null));
 
   // 상자/핸들 위치를 매 화면 갱신마다 직접 반영
   useEffect(() => {
@@ -137,12 +187,25 @@ export function SelectionOverlay() {
 
   /** 빈 곳/클립 위 클릭 → 선택 + 이동 시작 */
   const onBackgroundDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || editingId) return;
     const engine = previewRef.current;
     if (!engine) return;
     const hit = engine.hitTest(toProject(e.clientX, e.clientY));
     useUI.getState().select(hit);
     if (hit) startGesture(e, hit, 'move');
+  };
+
+  /** 텍스트를 두 번 누르면 바로 고치기 (R7.5) */
+  const onDoubleClick = (e: React.MouseEvent) => {
+    const engine = previewRef.current;
+    if (!engine) return;
+    const hit = engine.hitTest(toProject(e.clientX, e.clientY));
+    const clip = hit ? findClip(useProject.getState().edit, hit)?.clip : null;
+    if (clip?.type === 'text') {
+      actions.pause();
+      useUI.getState().select(clip.id);
+      setEditingId(clip.id);
+    }
   };
 
   return (
@@ -151,8 +214,10 @@ export function SelectionOverlay() {
       data-testid="preview-overlay"
       className="absolute inset-0 touch-none"
       onPointerDown={onBackgroundDown}
+      onDoubleClick={onDoubleClick}
       aria-hidden="true"
     >
+      <SafeAreaGuides />
       <div
         ref={boxRef}
         data-testid="selection-box"
@@ -193,6 +258,7 @@ export function SelectionOverlay() {
           style={{ cursor: HANDLE_CURSOR.rot }}
           className="pointer-events-auto absolute bottom-2 left-1/2 size-3.5 -translate-x-1/2 rounded-full border border-neutral-900 bg-cyan-300"
         />
+        {editingClip?.type === 'text' && <InlineEditor clip={editingClip} onDone={() => setEditingId(null)} />}
       </div>
     </div>
   );

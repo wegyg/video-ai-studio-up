@@ -15,8 +15,11 @@ export interface UIState {
   playing: boolean;
   pxPerFrame: number;
   snap: boolean;
+  /** 쇼츠 안전 영역 안내선 표시 (R7.9) */
+  safeArea: boolean;
   leftTab: LeftTab;
   select: (id: string | null) => void;
+  setSafeArea: (on: boolean) => void;
   setPlayhead: (frame: number) => void;
   setPlaying: (playing: boolean) => void;
   setZoom: (pxPerFrame: number) => void;
@@ -32,8 +35,10 @@ export const useUI = create<UIState>()((set) => ({
   playing: false,
   pxPerFrame: ZOOM_DEFAULT,
   snap: true,
+  safeArea: false,
   leftTab: 'media',
   select: (id) => set({ selectedClipId: id }),
+  setSafeArea: (on) => set({ safeArea: on }),
   setPlayhead: (frame) => set({ playhead: Math.max(0, Math.round(frame)) }),
   setPlaying: (playing) => set({ playing }),
   setZoom: (z) => set({ pxPerFrame: clampZoom(z) }),

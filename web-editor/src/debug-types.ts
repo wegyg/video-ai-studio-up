@@ -35,12 +35,24 @@ export interface DebugState {
         duration: number;
         inPoint?: number;
         assetId?: string;
-        text?: string;
         volume?: number;
         fadeIn?: number;
         fadeOut?: number;
         speed?: number;
         transform?: { x: number; y: number; scale: number; rotation: number; opacity: number };
+        // 텍스트 클립
+        text?: string;
+        font?: string;
+        size?: number;
+        weight?: number;
+        color?: string;
+        align?: string;
+        lineHeight?: number;
+        stroke?: { color: string; width: number };
+        box?: { enabled: boolean; color: string; opacity: number; padding: number; radius: number };
+        shadow?: { enabled: boolean; color: string; blur: number; offsetX: number; offsetY: number };
+        animIn?: { type: string; duration: number };
+        animOut?: { type: string; duration: number };
       }[];
     }[];
   };

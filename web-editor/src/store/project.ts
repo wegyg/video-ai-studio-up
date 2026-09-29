@@ -24,6 +24,8 @@ export interface ProjectState extends ProjectSnapshot {
   /** 성공하면 넣은 클립 id */
   addClip: (trackId: string, clip: Clip) => string | null;
   moveClip: (clipId: string, toTrackId: string, toStart: number) => void;
+  /** 같은 트랙에서 시작 프레임만 옮긴다 (속성 패널의 시간 입력) */
+  setClipStart: (clipId: string, start: number) => void;
   trimClip: (clipId: string, edge: 'start' | 'end', frame: number) => void;
   /** 성공하면 오른쪽 클립 id */
   splitClip: (clipId: string, at: number) => string | null;
@@ -60,6 +62,11 @@ export const useProject = create<ProjectState>()(
           set((s) => (s.assets[id] ? { assets: { ...s.assets, [id]: { ...s.assets[id], ...patch } } } : s)),
         addClip: (trackId, clip) => (apply((e) => ops.addClip(e, trackId, clip)) ? clip.id : null),
         moveClip: (clipId, toTrackId, toStart) => apply((e) => ops.moveClip(e, clipId, toTrackId, toStart)),
+        setClipStart: (clipId, start) =>
+          apply((e) => {
+            const loc = ops.findClip(e, clipId);
+            return loc ? ops.moveClip(e, clipId, loc.track.id, start) : e;
+          }),
         trimClip: (clipId, edge, frame) => apply((e) => ops.trimClip(e, get().assets, clipId, edge, frame)),
         splitClip: (clipId, at) => {
           const r = ops.splitClip(get().edit, clipId, at);
