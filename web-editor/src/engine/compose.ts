@@ -5,6 +5,7 @@
  * 트랜지션 구간에서는 두 클립을 각자 배치·필터까지 그린 장면 두 장을 만든 뒤 셰이더로 섞는다.
  */
 import { clipAdjust, DEFAULT_BACKGROUND } from '../model/filters';
+import { clipAtFrame } from '../model/keyframes';
 import { TRANSITION_KINDS, visualAt } from '../model/transitions';
 import { RATIO_SIZE, type ColorAdjust, type Clip, type EditState, type MediaClip, type TextClip, type Track, type Transform } from '../model/types';
 
@@ -146,14 +147,15 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
       const b = sources.visual(v.transition.to, frame);
       if (!a && !b) continue;
       layers.push({
-        from: a ? { clip: v.transition.from, src: a } : null,
-        to: b ? { clip: v.transition.to, src: b } : null,
+        from: a ? { clip: clipAtFrame(v.transition.from, frame), src: a } : null,
+        to: b ? { clip: clipAtFrame(v.transition.to, frame), src: b } : null,
         kind: TRANSITION_KINDS.indexOf(v.transition.kind),
         progress: v.progress,
       });
     } else {
       const src = sources.visual(v.clip, frame);
-      if (src) layers.push({ one: { clip: v.clip, src } });
+      // 키프레임이 있으면 이 프레임의 배치로 그린다 (model/keyframes.ts)
+      if (src) layers.push({ one: { clip: clipAtFrame(v.clip, frame), src } });
     }
   }
 
@@ -203,7 +205,7 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
     const text = edit.tracks.filter((t) => t.kind === 'text');
     for (let i = text.length - 1; i >= 0; i--) {
       const c = clipAt(text[i], frame);
-      if (c?.type === 'text') sources.text(ctx, c, frame);
+      if (c?.type === 'text') sources.text(ctx, clipAtFrame(c, frame), frame);
     }
   }
   ctx.restore();

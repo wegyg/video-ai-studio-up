@@ -234,6 +234,12 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
 - 합성: 두 클립을 각자 배치·필터까지 그린 장면 두 장(투명 배경, 프로젝트 해상도 × 배율)을 셰이더 `FS_TRANSITION`으로 섞는다(알파를 곱한 채로 올려 가장자리 검은 테가 없게). 무작위처럼 보이는 값(글리치)은 정수 해시라 미리보기와 내보내기(서로 다른 GL 컨텍스트)가 같다. 흐림 배경은 두 클립의 흐린 배경을 진행도만큼 섞는다. WebGL이 없으면 경계에서 바로 바뀐다.
 - 정리: 편집할 때마다(드래그 중에는 끝날 때 한 번) 맞닿지 않은 경계의 트랜지션을 지우고 길이를 실제 값으로 맞춘다. 끌다가 제자리로 오면 기록을 남기지 않는다.
 
+### 키프레임 (2-3, `model/keyframes.ts`)
+- 저장: 클립의 `keyframes = { x|y|scale|rotation|opacity|volume: [{ f, v, ease }] }`. `f`는 클립 시작 기준 프레임, `ease`는 그 키에서 다음 키까지(선형 / 부드럽게 = smoothstep).
+- 값: 첫 키 앞·마지막 키 뒤는 그 키 값, 사이는 보간. 키가 없는 속성은 클립 값. 그리기(`drawFrame`)는 프레임마다 `clipAtFrame`으로 배치를 바꿔 그리므로 미리보기·내보내기가 같다. 소리는 `gainAt`이 볼륨 키를 따르므로 미리보기 GainNode와 내보내기 믹스가 같다.
+- 고치기: 키가 있는 속성은 플레이헤드 시각의 키를 고치거나 새로 만든다(속성 패널·미리보기 끌기 공통 `setValues`). 앞 자르기·나누기는 키 오프셋을 옮겨 타임라인의 같은 순간에 남긴다. 범위 밖 키도 남겨 값이 끊기지 않게 한다.
+- 내보내기 디코딩 크기는 키 중 가장 큰 크기 기준(확대해도 흐려지지 않게).
+
 ### 원본 색 해석 맞추기 (`media/color.ts`)
 미리보기는 `<video>`가, 내보내기는 WebCodecs(Mediabunny)가 원본을 푼다. 원본에 색 정보(primaries·transfer·matrix)가 셋 다 있지 않으면:
 - Chrome `<video>`: 모두 버리고 세로(natural) 720 미만은 BT.601, 이상은 BT.709로 가정 (Chromium `media/ffmpeg/ffmpeg_common.cc`, VP9·AV1 제외)

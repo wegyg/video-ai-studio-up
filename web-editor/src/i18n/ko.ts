@@ -263,6 +263,16 @@ export const ko = {
     resetTransform: '화면 배치 초기화',
     noAudio: '이 클립에는 소리가 없습니다.',
     units: { percent: '%', degree: '°', second: '초', times: '배' },
+    keyframe: {
+      toggle: (label: string) => `${label} 키프레임 넣기/빼기`,
+      position: '위치',
+      ease: '이징',
+      linear: '선형',
+      smooth: '부드럽게',
+      prev: '이전 키프레임',
+      next: '다음 키프레임',
+      hint: '◆를 누르면 지금 위치에 키프레임이 생깁니다. 다른 시간으로 옮겨 값을 바꾸면 그 사이가 움직입니다.',
+    },
     transition: {
       title: '트랜지션',
       kind: '종류',
@@ -291,6 +301,7 @@ export const ko = {
     audioTrackShort: '오디오',
     transition: (name: string) => `트랜지션: ${name}`,
     dropTransition: '여기에 놓기',
+    keyframe: '키프레임 (끌어서 옮기기)',
   },
   tracks: {
     text: '텍스트',

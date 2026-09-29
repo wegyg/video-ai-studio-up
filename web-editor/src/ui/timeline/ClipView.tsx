@@ -6,9 +6,11 @@ import { memo, useLayoutEffect, useRef } from 'react';
 import { ko } from '../../i18n/ko';
 import { PEAKS_PER_SEC } from '../../media/derive-protocol';
 import { useMedia, type Filmstrip } from '../../media/store';
+import { keyOffsets, moveKeys } from '../../model/keyframes';
 import { FPS, type Clip, type MediaClip } from '../../model/types';
 import { useProject } from '../../store/project';
 import { useUI } from '../../store/ui';
+import { history } from '../../store/history';
 import { drawPeaks } from '../waveform';
 import { startClipGesture, type GestureKind } from './gestures';
 import { ROW_H } from './layout';
@@ -35,6 +37,66 @@ function drawFilmstrip(ctx: CanvasRenderingContext2D, f: Filmstrip, clip: MediaC
     const sy = Math.floor(idx / f.cols) * f.thumbH;
     ctx.drawImage(f.bitmap, sx, sy, f.thumbW, f.thumbH, localX - visL, 0, tileW, h);
   }
+}
+
+/**
+ * 키프레임 표시 (R16): 클립 안의 키 시각마다 ◆. 누르면 그 시각으로 이동, 끌면 그 시각의 키들을 옮긴다(끌기 한 번 = 기록 1개).
+ * 끄는 동안에는 늘 시작 상태에서 다시 계산한다 → 다른 키 위를 지나가도 그 키가 지워지지 않는다(놓은 곳의 키만 대신한다).
+ */
+function KeyMarkers({ clip, ppf }: { clip: Clip; ppf: number }) {
+  const offsets = keyOffsets(clip).filter((f) => f >= 0 && f < clip.duration);
+  if (!offsets.length) return null;
+  const begin = (f: number) => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    // 끄는 동안 ◆가 새 시각 자리에 다시 그려지므로(요소가 바뀜) 이벤트는 창 전체에서 받는다
+    useUI.getState().select(clip.id);
+    const orig = clip;
+    const x0 = e.clientX;
+    let to = f;
+    let moved = false;
+    history.beginGesture();
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      if (!moved && Math.abs(ev.clientX - x0) < 3) return;
+      moved = true;
+      const z = useUI.getState().pxPerFrame;
+      const next = Math.max(0, Math.min(orig.duration - 1, f + Math.round((ev.clientX - x0) / z)));
+      if (next === to) return;
+      to = next;
+      useProject.getState().updateClip(orig.id, () => moveKeys(orig, f, to));
+      useUI.getState().setPlayhead(orig.start + to);
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      history.endGesture();
+      useUI.getState().setPlayhead(orig.start + to);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+  return (
+    <>
+      {offsets.map((f) => (
+        <div
+          key={f}
+          data-testid="keyframe"
+          data-offset={f}
+          role="button"
+          aria-label={ko.timeline.keyframe}
+          title={ko.timeline.keyframe}
+          onPointerDown={begin(f)}
+          className="absolute bottom-0.5 z-[4] size-2.5 -translate-x-1/2 rotate-45 cursor-ew-resize bg-white ring-1 ring-black/70 hover:bg-cyan-300"
+          style={{ left: f * ppf + ppf / 2 }}
+        />
+      ))}
+    </>
+  );
 }
 
 /** 소리가 있는 영상 클립의 아래쪽 파형 띠 높이 비율 (R4.3) */
@@ -194,6 +256,7 @@ export const ClipView = memo(function ClipView({ clip, rowKind, scroller }: { cl
         </span>
       )}
       {hasAudio && <FadeOverlay clip={clip as MediaClip} ppf={ppf} width={width} selected={selected} onBegin={begin} />}
+      <KeyMarkers clip={clip} ppf={ppf} />
       <div
         data-testid="trim-start"
         onPointerDown={begin('trim-start')}

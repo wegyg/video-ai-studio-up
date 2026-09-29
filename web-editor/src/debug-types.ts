@@ -53,6 +53,7 @@ export interface DebugState {
         shadow?: { enabled: boolean; color: string; blur: number; offsetX: number; offsetY: number };
         animIn?: { type: string; duration: number };
         animOut?: { type: string; duration: number };
+        keyframes?: Record<string, { f: number; v: number; ease: string }[]>;
         // 트랜지션·필터 (2단계)
         transitionIn?: { kind: string; duration: number };
         filter?: {

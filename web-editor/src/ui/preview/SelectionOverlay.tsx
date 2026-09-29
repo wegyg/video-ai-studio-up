@@ -10,6 +10,7 @@ import { previewRef } from '../../engine/preview/PreviewEngine';
 import { SAFE_AREA } from '../../engine/text';
 import { CORNERS, normalizeAngle, rotationFromPointer, scaleFromCorner, snapAngle, type HandleId, type Point } from '../../engine/geometry';
 import { ko } from '../../i18n/ko';
+import { transformAt } from '../../model/keyframes';
 import { findClip } from '../../model/ops';
 import { RATIO_SIZE, type TextClip, type Transform } from '../../model/types';
 import { history } from '../../store/history';
@@ -140,14 +141,15 @@ export function SelectionOverlay() {
     actions.pause(); // 재생 중이면 멈춰서 상자가 커서 밑에서 움직이지 않게 한다
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
-    const startT: Transform = loc.clip.transform;
+    // 키프레임이 있으면 지금 보이는 배치에서 시작한다 (model/keyframes.ts)
+    const startT: Transform = transformAt(loc.clip, useUI.getState().playhead);
     const p0 = toProject(e.clientX, e.clientY);
     const startAngle = rotationFromPointer(p0, startBox);
     let moved = false;
     history.beginGesture();
 
-    const setTransform = (patch: Partial<Transform>) =>
-      useProject.getState().updateClip(clipId, (c) => ({ ...c, transform: { ...c.transform, ...patch } }));
+    // 키가 있는 속성은 플레이헤드에 키를 넣거나 고친다
+    const setTransform = (patch: Partial<Transform>) => actions.setValuesAt(clipId, patch);
 
     const onMove = (ev: PointerEvent) => {
       if (ev.pointerId !== e.pointerId) return;

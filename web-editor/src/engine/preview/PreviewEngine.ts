@@ -20,6 +20,7 @@ import { clipAt, drawFrame, type FrameSources } from '../compose';
 import { sharedEffects } from '../gl/effects';
 import { needsEffects } from '../../model/filters';
 import { sourceFrame, visibleRange } from '../../model/transitions';
+import { transformAt } from '../../model/keyframes';
 import { clipBox, containsPoint, textBox, type Box, type Point } from '../geometry';
 import { drawTextClip, layoutText } from '../text';
 import { ensureFont, isFontLoaded, type FontFamily, type FontWeight } from '../../fonts';
@@ -544,11 +545,11 @@ export class PreviewEngine {
     if (c.type === 'text') {
       // 텍스트는 글자 배치 결과가 곧 크기다 (맞춤 계산을 하지 않는다)
       const l = layoutText(c, W, H);
-      return textBox(l.width, l.height, c.transform, W, H);
+      return textBox(l.width, l.height, transformAt(c, frame), W, H);
     }
     const size = this.sourceSize(c);
     if (!size) return null;
-    return clipBox(size.width, size.height, c.transform, W, H);
+    return clipBox(size.width, size.height, transformAt(c, frame), W, H);
   }
 
   /** 프로젝트 좌표의 점에 있는 가장 위 클립 id (없으면 null). 텍스트 → 위쪽 영상 트랙 순서로 본다 */

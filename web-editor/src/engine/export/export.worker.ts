@@ -28,6 +28,7 @@ import { createEffects } from '../gl/effects';
 import { matchPreviewColor } from '../../media/color';
 import { needsEffects } from '../../model/filters';
 import { sourceFrame, visibleRange, visualAt } from '../../model/transitions';
+import { maxScale } from '../../model/keyframes';
 import { drawTextClip } from '../text';
 import { RATIO_SIZE, type EditState, type MediaClip, type Track } from '../../model/types';
 import type { ExportMessage, ExportRequest } from './protocol';
@@ -175,7 +176,8 @@ async function run(req: ExportRequest): Promise<void> {
         const v = videos.get(clip.assetId);
         if (!v) return null;
         const drawn = baseSize(v.width, v.height, PW, PH);
-        const k = Math.min(1, (drawn.w * Math.max(0.05, clip.transform.scale) * outScale) / v.width);
+        // 키프레임으로 커지는 클립은 가장 클 때 기준으로 푼다 (확대해도 흐려지지 않게)
+        const k = Math.min(1, (drawn.w * Math.max(0.05, maxScale(clip)) * outScale) / v.width);
         const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
         const sink =
           k > 0.95

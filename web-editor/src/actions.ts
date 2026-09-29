@@ -3,8 +3,9 @@
  */
 import { ko } from './i18n/ko';
 import { toast } from './ui/toasts';
-import { clipEnd, createMediaClip, createTextClip, defaultTrackFor, findClip, trackKindFor } from './model/ops';
+import { clipEnd, createMediaClip, createTextClip, DEFAULT_TRANSFORM, defaultTrackFor, findClip, trackKindFor } from './model/ops';
 import { NEUTRAL_ADJUST, presetFilter } from './model/filters';
+import { keyOffsets, setEaseAt, setValues, toggleKeys, TRANSFORM_PROPS } from './model/keyframes';
 import {
   cutsOf,
   maxTransitionFrames,
@@ -13,7 +14,7 @@ import {
   transitionInto,
   type Cut,
 } from './model/transitions';
-import type { Clip, ColorAdjust, EditState, MediaClip, Ratio, TextStyle, Track, TransitionKind } from './model/types';
+import type { Clip, ColorAdjust, EditState, Easing, KeyProp, MediaClip, Ratio, TextStyle, Track, TransitionKind } from './model/types';
 import { history } from './store/history';
 import { useProject } from './store/project';
 import { useUI } from './store/ui';
@@ -201,6 +202,47 @@ export const actions = {
       return rest;
     });
     if (useUI.getState().selectedTransition === toClipId) useUI.getState().selectTransition(null);
+  },
+  /**
+   * 값 바꾸기 (속성 패널·미리보기 끌기, R16): 키프레임이 있는 속성은 플레이헤드에 키를 넣거나 고치고,
+   * 없는 속성은 클립 값을 고친다 (model/keyframes.ts)
+   */
+  setValuesAt(clipId: string, patch: Partial<Record<KeyProp, number>>): void {
+    const frame = useUI.getState().playhead;
+    useProject.getState().updateClip(clipId, (c) => setValues(c, frame, patch));
+  },
+  /** ◆ 버튼: 플레이헤드에 키가 다 있으면 지우고, 아니면 지금 값으로 넣는다 */
+  toggleKeyframe(clipId: string, props: KeyProp[]): void {
+    const frame = useUI.getState().playhead;
+    const loc = findClip(useProject.getState().edit, clipId);
+    if (!loc || frame < loc.clip.start || frame >= clipEnd(loc.clip)) return;
+    useProject.getState().updateClip(clipId, (c) => toggleKeys(c, frame, props));
+  },
+  /** 플레이헤드에 있는 키들의 이징 (그 키에서 다음 키까지) */
+  setKeyEase(clipId: string, ease: Easing): void {
+    const frame = useUI.getState().playhead;
+    useProject.getState().updateClip(clipId, (c) => setEaseAt(c, frame - c.start, ease));
+  },
+  /** 이전/다음 키프레임으로 플레이헤드 이동 (클립 안의 키만) */
+  jumpKeyframe(clipId: string, dir: -1 | 1): void {
+    const loc = findClip(useProject.getState().edit, clipId);
+    if (!loc) return;
+    const c = loc.clip;
+    const now = useUI.getState().playhead - c.start;
+    const inside = keyOffsets(c).filter((f) => f >= 0 && f < c.duration);
+    const f = dir < 0 ? [...inside].reverse().find((x) => x < now) : inside.find((x) => x > now);
+    if (f !== undefined) actions.seek(c.start + f);
+  },
+  /** 화면 배치 초기화: 배치 키프레임도 지운다 */
+  resetTransform(clipId: string): void {
+    useProject.getState().updateClip(clipId, (c) => {
+      const keys = { ...c.keyframes };
+      for (const p of TRANSFORM_PROPS) delete keys[p];
+      const out: Clip = { ...c, transform: { ...DEFAULT_TRANSFORM } };
+      if (Object.keys(keys).length) out.keyframes = keys;
+      else delete out.keyframes;
+      return out;
+    });
   },
   /** 텍스트 클립 추가 (R7.1). 첫 텍스트 트랙의 플레이헤드 위치에 넣고 선택한다 */
   addTextClip(style?: TextStyle): string | null {

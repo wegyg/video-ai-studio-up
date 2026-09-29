@@ -2,6 +2,7 @@
  * 편집 연산 (순수 함수). 입력 EditState를 바꾸지 않고 새 상태를 돌려준다.
  * 아무것도 바뀌지 않으면 **같은 객체**를 돌려준다 → 실행 취소 기록에 빈 항목이 생기지 않는다.
  */
+import { shiftKeyframes } from './keyframes';
 import { TEXT_STYLE_BASE } from './text-presets';
 import {
   FPS,
@@ -202,6 +203,8 @@ export function trimClip(
     next = isSourced(c)
       ? { ...c, start, duration: end - start, inPoint: c.inPoint + delta }
       : { ...c, start, duration: end - start };
+    // 키프레임은 타임라인의 같은 순간에 남는다 (클립 기준 시각이 delta만큼 당겨진다)
+    if (c.keyframes) next = { ...next, keyframes: shiftKeyframes(c.keyframes, -delta) };
   } else {
     let max = Infinity;
     for (const o of others) if (o.start > c.start) max = Math.min(max, o.start);
@@ -249,6 +252,8 @@ export function splitClip(edit: EditState, clipId: string, at: number): { edit: 
     left = { ...c, duration: leftDur };
     right = { ...c, id: rightId, start: cut, duration: rightDur };
   }
+  // 오른쪽 조각도 키를 모두 가진다 (기준 시각만 옮김) → 자른 곳에서도 값이 이어진다
+  if (c.keyframes) right = { ...right, keyframes: shiftKeyframes(c.keyframes, -leftDur) };
   const clips = loc.track.clips.flatMap((x) => (x.id === clipId ? [left, right] : [x]));
   return { edit: replaceTrack(edit, { ...loc.track, clips }), rightId };
 }

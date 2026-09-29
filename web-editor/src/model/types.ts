@@ -42,12 +42,27 @@ export interface Transform {
   opacity: number;
 }
 
+/** 키프레임을 넣을 수 있는 값 (R16). 위치는 x·y 두 값 */
+export type KeyProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity' | 'volume';
+/** 이 키에서 다음 키까지 가는 방식: 선형 / 부드럽게(천천히 시작해 천천히 멈춤) */
+export type Easing = 'linear' | 'smooth';
+export interface Keyframe {
+  /** 클립 시작 기준 프레임 */
+  f: number;
+  v: number;
+  ease: Easing;
+}
+/** 속성별 키 목록 (f 오름차순). 없으면 그 속성은 클립 값 그대로 — model/keyframes.ts */
+export type Keyframes = Partial<Record<KeyProp, Keyframe[]>>;
+
 export interface ClipBase {
   id: string;
   /** 타임라인 시작 프레임 */
   start: number;
   /** 길이(프레임), 1 이상 */
   duration: number;
+  /** 키프레임 (2단계). 예전에 저장한 프로젝트에는 없다 */
+  keyframes?: Keyframes;
 }
 
 /**
