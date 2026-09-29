@@ -38,6 +38,44 @@ async function buildLongProject(page: Page) {
   return clips;
 }
 
+const noSavePicker = (page: Page) =>
+  page.addInitScript(() => {
+    delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+  });
+
+/**
+ * 지금 프로젝트(60초 1080×1920)를 내보내고 걸린 시간과 결과물을 기록한다 (A2 공통).
+ * 결과물이 올바른지는 여기서 확인하고, 60초 이내인지는 사용자 노트북에서 판단한다(러너에는 GPU가 없다).
+ */
+async function measureExport(page: Page, condition: string) {
+  await page.getByTestId('open-export').click();
+  const started = Date.now();
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 880_000 }), page.getByTestId('export-start').click()]);
+  await expect(page.getByTestId('export-done')).toBeVisible({ timeout: 60_000 });
+  const wall = (Date.now() - started) / 1000;
+  const summary = (await page.getByTestId('export-summary').textContent()) ?? '';
+  const bytes = readFileSync(await download.path()).length;
+
+  const info = await page.evaluate(() => window.__editor.verifyLastExport([1, 30, 55], [[0.5, 0.5]]));
+  const report = {
+    조건: condition,
+    화면에표시: summary,
+    실제걸린초: Number(wall.toFixed(1)),
+    파일MB: Number((bytes / 1e6).toFixed(1)),
+    해상도: `${info.info.width}x${info.info.height}`,
+    프레임수: info.info.frameCount,
+    영상길이: info.info.videoDuration,
+  };
+  test.info().annotations.push({ type: 'A2', description: JSON.stringify(report) });
+  console.log('A2 ' + JSON.stringify(report));
+
+  expect(info.info.width).toBe(1080);
+  expect(info.info.height).toBe(1920);
+  expect(info.info.frameCount).toBe(1800);
+  expect(info.info.videoDuration).toBeCloseTo(60, 1);
+  expect(summary).toMatch(/60\.0초 영상 · 내보내기 \d+\.\d초/);
+}
+
 test.describe('A1·A2 (큰 파일 필요)', () => {
   test.skip(!PERF_DIR, 'PERF_DIR이 없으면 건너뜀 — npm run fixtures:perf');
 
@@ -93,41 +131,49 @@ test.describe('A1·A2 (큰 파일 필요)', () => {
 
   test('A2: 60초 1080×1920 내보내기 시간을 기록한다', async ({ page }) => {
     test.setTimeout(900_000);
-    await page.addInitScript(() => {
-      delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
-    });
+    await noSavePicker(page);
     await buildLongProject(page);
     expect((await state(page)).edit.ratio).toBe('9:16');
+    await measureExport(page, '효과 없음 (확인 2와 같은 조건)');
+  });
 
-    await page.getByTestId('open-export').click();
-    const started = Date.now();
-    const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 880_000 }),
-      page.getByTestId('export-start').click(),
-    ]);
-    await expect(page.getByTestId('export-done')).toBeVisible({ timeout: 60_000 });
-    const wall = (Date.now() - started) / 1000;
-    const summary = (await page.getByTestId('export-summary').textContent()) ?? '';
-    const bytes = readFileSync(await download.path()).length;
+  // 2단계: WebGL 효과가 매 프레임 도는 경우의 내보내기 시간 (A2와 같은 60초 프로젝트, 기록만).
+  // GPU가 없는 곳(CI 러너·샌드박스)에서는 WebGL을 CPU로 흉내(SwiftShader) 내므로 사용자 노트북보다 훨씬 느리다
+  // (docs/perf.md). CI에서는 한 번에 몇 분씩 걸려 기본으로 끄고, A2_FX=1일 때만 돌린다.
+  const fxSkip = !!process.env.CI && !process.env.A2_FX;
+  test('A2-필터: 5개 클립 모두 필터(영화처럼 + 선명도 50)', async ({ page }) => {
+    test.skip(fxSkip, 'CI에서는 A2_FX=1일 때만');
+    test.setTimeout(900_000);
+    await noSavePicker(page);
+    const clips = await buildLongProject(page);
+    await page.getByRole('tab', { name: '효과' }).click();
+    for (const c of clips) {
+      await clipEl(page, c.id).click();
+      await page.locator('[data-testid=filter-preset][data-preset-id=cinema]').click();
+      await page.getByTestId('adjust-sharpness').fill('50');
+    }
+    const after = (await state(page)).edit.tracks[2].clips;
+    expect(after.map((c) => [c.filter?.preset, c.filter?.adjust.sharpness])).toEqual(clips.map(() => ['cinema', 50]));
+    await measureExport(page, '필터: 5개 클립 모두 영화처럼 + 선명도 50 (WebGL 필터 매 프레임 1080×1920)');
+  });
 
-    const info = await page.evaluate(() => window.__editor.verifyLastExport([1, 30, 55], [[0.5, 0.5]]));
-    const report = {
-      화면에표시: summary,
-      실제걸린초: Number(wall.toFixed(1)),
-      파일MB: Number((bytes / 1e6).toFixed(1)),
-      해상도: `${info.info.width}x${info.info.height}`,
-      프레임수: info.info.frameCount,
-      영상길이: info.info.videoDuration,
-    };
-    test.info().annotations.push({ type: 'A2', description: JSON.stringify(report) });
-    console.log('A2 ' + JSON.stringify(report));
-
-    // 결과물이 올바른지는 여기서 확인하고, 60초 이내인지는 사용자 노트북에서 판단한다
-    expect(info.info.width).toBe(1080);
-    expect(info.info.height).toBe(1920);
-    expect(info.info.frameCount).toBe(1800);
-    expect(info.info.videoDuration).toBeCloseTo(60, 1);
-    expect(summary).toMatch(/60\.0초 영상 · 내보내기 \d+\.\d초/);
+  test('A2-배경: 클립 80% 크기 + 흐림 채우기 배경 + 필터', async ({ page }) => {
+    test.skip(fxSkip, 'CI에서는 A2_FX=1일 때만');
+    test.setTimeout(900_000);
+    await noSavePicker(page);
+    const clips = await buildLongProject(page);
+    await page.getByRole('tab', { name: '효과' }).click();
+    await page.getByTestId('bg-blur').click();
+    for (const c of clips) {
+      await clipEl(page, c.id).click();
+      await page.getByTestId('prop-scale').fill('80');
+      await page.getByTestId('prop-scale').press('Enter');
+      await page.locator('[data-testid=filter-preset][data-preset-id=cinema]').click();
+    }
+    const edit = (await state(page)).edit;
+    expect(edit.background).toEqual({ kind: 'blur', amount: 50 });
+    expect(edit.tracks[2].clips.map((c) => [c.transform?.scale, c.filter?.preset])).toEqual(clips.map(() => [0.8, 'cinema']));
+    await measureExport(page, '배경: 클립 80% + 흐림 채우기 + 영화처럼 (흐림·필터 셰이더 매 프레임)');
   });
 });
 

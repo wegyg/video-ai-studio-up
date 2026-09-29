@@ -45,6 +45,7 @@ npx serve dist
 E2E 테스트 중 일부는 추가 조건이 있을 때만 돕니다.
 - `PERF_DIR=$PWD/.perf-fixtures` — 수용 기준 A1(재생 성능)·A2(60초 내보내기 시간). CPU를 많이 쓰므로 따로 하나씩 돌립니다:
   `PERF_DIR=$PWD/.perf-fixtures npx playwright test acceptance -g "A1|A2" --workers=1`
+  (필터·흐림 배경을 켠 내보내기 A2-필터·A2-배경도 함께 돕니다. CI에서는 `A2_FX=1`일 때만 — GPU가 없어 몇 분씩 걸립니다. 결과는 `docs/perf.md`)
 - `FFMPEG_PATH`, `FFPROBE_PATH` (또는 PATH의 ffmpeg) — 내보낸 MP4를 **Chrome이 아닌 디코더**로 풀어 미리보기와 비교(휴대폰 재생 확인)
 - `BASE_URL=https://…` — 배포된 사이트를 대상으로 같은 테스트 실행
 
