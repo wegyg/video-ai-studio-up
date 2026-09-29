@@ -32,8 +32,8 @@
   - _요구사항: R1.3, R2, R3, R9.1–R9.2_
 
 - [ ] **2.5 GitHub Pages 자동 배포** *(추가)*
-  - 저장소 설정: Pages 소스를 "GitHub Actions"로 켜고, `github-pages` 환경에서 작업 브랜치의 배포를 허용한다
-  - 워크플로 `.github/workflows/web-editor-pages.yml`: ubuntu-latest에서 `npm ci` → `npm run build` → Playwright(chrome) 테스트 → 통과하면 `web-editor/dist`를 Pages에 배포. 테스트가 실패하면 배포하지 않는다
+  - Pages 소스: `gh-pages` 브랜치. 저장소 설정 API는 샌드박스 인증으로 403이라 쓸 수 없었다. `gh-pages` 브랜치를 올리면 Pages가 자동으로 켜진다(design.md §12)
+  - 워크플로 `.github/workflows/web-editor-pages.yml`: ubuntu-latest에서 `npm ci` → 단위 테스트 → `npm run build` → Playwright(chrome) 테스트 → 통과하면 `web-editor/dist`를 `gh-pages`에 올린다. 테스트가 실패하면 배포하지 않는다
   - 트리거: 작업 브랜치에 push(`web-editor/**` 변경 시) + 수동 실행
   - 확인: 배포된 주소를 Playwright로 열어 앱이 뜨는지 검사하고 주소를 보고한다
   - 이 태스크 이후로는 태스크가 끝날 때마다 배포하고 접속 주소를 보고한다

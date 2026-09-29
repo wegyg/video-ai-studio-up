@@ -206,5 +206,7 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
 
 ## 12. 배포
 - `vite.config.ts`에서 `base: './'`로 설정해 어느 경로에 올려도 동작하게 한다. 서버 코드는 없다.
-- **GitHub Pages(기본):** `.github/workflows/web-editor-pages.yml`이 작업 브랜치에 push될 때 `web-editor/`를 빌드하고 Playwright 테스트를 통과하면 `actions/upload-pages-artifact@v5` + `actions/deploy-pages@v5`로 배포한다. 주소는 `https://wegyg.github.io/video-ai-studio-up/`이다. Pages는 https라 WebCodecs가 동작한다.
+- **GitHub Pages(기본):** `.github/workflows/web-editor-pages.yml`이 작업 브랜치(또는 main)에 push될 때 실행된다. 순서는 `web-editor/` 단위 테스트 → 빌드 → Playwright 테스트이고, 모두 통과하면 `dist/`를 **`gh-pages` 브랜치**에 올린다(`.nojekyll` 포함). 주소는 `https://wegyg.github.io/video-ai-studio-up/`이다. Pages는 https라 WebCodecs가 동작한다.
+  - 원래 계획은 `actions/deploy-pages`였다. 이 방식은 저장소 설정 변경(Pages 소스를 "GitHub Actions"로 바꾸기, `github-pages` 환경의 브랜치 허용)이 필요한데, 샌드박스 인증으로는 설정 API가 403으로 거부되었다. `gh-pages` 브랜치 방식은 브랜치를 올리는 순간 Pages가 자동으로 켜져서(확인 완료: build_type=legacy, source=gh-pages) 사용자가 설정할 것이 없다.
+  - 배포 확인: `DEPLOY_URL=… npx playwright test deployed`는 배포본이 로컬 최신 빌드와 같은지(번들 해시), https에서 편집기와 인코딩·글꼴이 되는지 검사한다.
 - README에 적을 다른 실행 방법: 로컬에서 `npx serve dist` 실행 후 Chrome으로 `http://localhost:3000` 열기. file://로 열면 WebCodecs가 동작하지 않으므로 앱이 안내 화면을 보여 준다(R1.3).
