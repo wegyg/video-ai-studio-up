@@ -56,6 +56,10 @@ export const debugApi: EditorDebugApi = {
     derivedKeys: (await (await db()).getAllKeys('derived')).map(String),
   }),
   preview: () => previewRef.current?.stats() ?? null,
+  clipBox: (clipId) => {
+    const id = clipId ?? useUI.getState().selectedClipId;
+    return id ? (previewRef.current?.boxOf(id) ?? null) : null;
+  },
   previewPixel: (fx = 0.5, fy = 0.5) => {
     const c = document.querySelector<HTMLCanvasElement>('[data-testid=preview-canvas]')!;
     const d = c.getContext('2d')!.getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data;

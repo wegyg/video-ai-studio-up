@@ -28,7 +28,20 @@ export interface DebugState {
       kind: string;
       name: string;
       muted: boolean;
-      clips: { id: string; type: string; start: number; duration: number; inPoint?: number; assetId?: string; text?: string }[];
+      clips: {
+        id: string;
+        type: string;
+        start: number;
+        duration: number;
+        inPoint?: number;
+        assetId?: string;
+        text?: string;
+        volume?: number;
+        fadeIn?: number;
+        fadeOut?: number;
+        speed?: number;
+        transform?: { x: number; y: number; scale: number; rotation: number; opacity: number };
+      }[];
     }[];
   };
   ui: { selectedClipId: string | null; playhead: number; playing: boolean; pxPerFrame: number; snap: boolean; leftTab: string };
@@ -70,6 +83,8 @@ export interface EditorDebugApi {
   } | null;
   /** 미리보기 캔버스의 (x, y) 비율 위치 픽셀 [r,g,b] (0~1, 기본 가운데) */
   previewPixel: (fx?: number, fy?: number) => number[];
+  /** 선택한(또는 지정한) 클립이 미리보기에서 놓인 사각형 — 프로젝트 좌표 */
+  clipBox: (clipId?: string) => { cx: number; cy: number; w: number; h: number; rotation: number } | null;
   [key: string]: unknown;
 }
 

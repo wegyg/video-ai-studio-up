@@ -8,6 +8,7 @@ import { useProject } from '../store/project';
 import { useUI } from '../store/ui';
 import { IconButton } from './common';
 import { IconPause, IconPlay } from './icons';
+import { SelectionOverlay } from './preview/SelectionOverlay';
 
 /** 무대 크기 안에 프로젝트 비율 그대로 들어가는 최대 크기 */
 function useFittedBox(width: number, height: number) {
@@ -120,6 +121,7 @@ export function Preview() {
           style={{ width: box.w, height: box.h }}
         >
           <canvas ref={canvasRef} data-testid="preview-canvas" className="absolute inset-0 block h-full w-full" />
+          <SelectionOverlay />
         </div>
       </div>
       <div className="flex h-11 shrink-0 items-center justify-center gap-4 border-t border-neutral-800">

@@ -11,11 +11,13 @@
  */
 import { sourceBlobs, useMedia } from '../../media/store';
 import { gainAt } from '../../model/audio';
+import { findClip } from '../../model/ops';
 import { editDuration } from '../../model/time';
-import { FPS, RATIO_SIZE, type EditState, type MediaClip } from '../../model/types';
+import { FPS, RATIO_SIZE, type Clip, type EditState, type MediaClip } from '../../model/types';
 import { useProject } from '../../store/project';
 import { useUI } from '../../store/ui';
-import { drawFrame, type FrameSources } from '../compose';
+import { clipAt, drawFrame, type FrameSources } from '../compose';
+import { clipBox, containsPoint, type Box, type Point } from '../geometry';
 
 const PRELOAD = 2 * FPS;
 const KEEP = FPS;
@@ -437,6 +439,47 @@ export class PreviewEngine {
     this.draws.push(t);
     while (this.draws.length && this.draws[0] < t - 1000) this.draws.shift();
     while (this.drifts.length && this.drifts[0].t < t - 2000) this.drifts.shift();
+  }
+
+  /** 클립의 소스 크기. 아직 준비되지 않았거나 화면에 안 나오는 종류면 null */
+  sourceSize(clip: Clip): { width: number; height: number } | null {
+    if (clip.type === 'image') {
+      const b = this.images.get(clip.assetId);
+      return b instanceof ImageBitmap ? { width: b.width, height: b.height } : null;
+    }
+    if (clip.type === 'video') {
+      const v = this.slots.get(clip.id)?.el as HTMLVideoElement | undefined;
+      return v && v.videoWidth > 0 ? { width: v.videoWidth, height: v.videoHeight } : null;
+    }
+    return null; // audio: 화면 없음 / text: 태스크 7에서 연결
+  }
+
+  /** 지금 플레이헤드에서 이 클립이 놓인 사각형 (화면에 없으면 null) */
+  boxOf(clipId: string): Box | null {
+    const edit = useProject.getState().edit;
+    const frame = useUI.getState().playhead;
+    const loc = findClip(edit, clipId);
+    if (!loc || loc.track.kind === 'audio') return null;
+    const c = loc.clip;
+    if (frame < c.start || frame >= c.start + c.duration) return null;
+    const size = this.sourceSize(c);
+    if (!size) return null;
+    const { width: W, height: H } = RATIO_SIZE[edit.ratio];
+    return clipBox(size.width, size.height, c.transform, W, H);
+  }
+
+  /** 프로젝트 좌표의 점에 있는 가장 위 클립 id (없으면 null). 텍스트 → 위쪽 영상 트랙 순서로 본다 */
+  hitTest(p: Point): string | null {
+    const edit = useProject.getState().edit;
+    const frame = useUI.getState().playhead;
+    const visual = edit.tracks.filter((t) => t.kind === 'text' || t.kind === 'video');
+    for (const track of visual) {
+      const c = clipAt(track, frame);
+      if (!c) continue;
+      const box = this.boxOf(c.id);
+      if (box && containsPoint(p, box)) return c.id;
+    }
+    return null;
   }
 
   stats(): PreviewStats {
