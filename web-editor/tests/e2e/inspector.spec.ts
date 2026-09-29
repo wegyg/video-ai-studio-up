@@ -68,10 +68,23 @@ test('미리보기 클릭으로 선택/해제 (회전을 고려한 판정)', asy
   await page.getByTestId('prop-rotation').fill('45');
   await page.getByTestId('prop-rotation').press('Enter');
   await expect.poll(async () => (await transform(page)).rotation).toBe(45);
+  // 45° 돌린 정사각형에서 "돌리기 전 모서리 방향"으로 0.42배 떨어진 점은 회전한 도형 밖이다.
+  // (지역 좌표 |lx| = 1.414 × 0.42 × 1080 = 641 > 절반 540)
+  // 미리보기 테두리에 너무 붙지 않는 값을 써서 화면 배율이 달라도 안정적으로 눌린다.
   const b = (await box(page))!;
-  const corner = { x: f.x + (b.cx - b.w / 2 + 12) * f.s, y: f.y + (b.cy - b.h / 2 + 12) * f.s };
-  await page.mouse.click(corner.x, corner.y);
+  const d = 0.42;
+  const outside = { x: f.x + (b.cx - b.w * d) * f.s, y: f.y + (b.cy - b.h * d) * f.s };
+  expect(outside.x).toBeGreaterThan(f.x + 8); // 미리보기 안쪽을 누르는지 확인
+  expect(outside.y).toBeGreaterThan(f.y + 8);
+  await page.mouse.click(outside.x, outside.y);
   expect((await state(page)).ui.selectedClipId).toBeNull();
+  // 같은 점을 회전 전에 누르면 선택된다 (판정이 회전을 반영한다는 뜻)
+  await page.mouse.click(f.x + f.width / 2, f.y + f.height / 2);
+  await page.getByTestId('prop-rotation').fill('0');
+  await page.getByTestId('prop-rotation').press('Enter');
+  await expect.poll(async () => (await transform(page)).rotation).toBe(0);
+  await page.mouse.click(outside.x, outside.y);
+  expect((await state(page)).ui.selectedClipId).toBe(img);
 });
 
 test('안쪽을 끌어 이동: 기록 1개, 미리보기 픽셀도 바뀌고, Ctrl+Z로 복구 (R6.4, R9.3)', async ({ page }) => {
