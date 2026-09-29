@@ -16,10 +16,30 @@ export interface SpikeResult {
   fonts: Record<string, boolean>;
 }
 
+/** 테스트에서 읽는 상태 (직렬화된 데이터) */
+export interface DebugState {
+  id: string;
+  name: string;
+  assets: Record<string, { id: string; kind: string; name: string; durationFrames?: number; width?: number; height?: number; hasAudio: boolean }>;
+  edit: {
+    ratio: string;
+    tracks: {
+      id: string;
+      kind: string;
+      name: string;
+      muted: boolean;
+      clips: { id: string; type: string; start: number; duration: number; inPoint?: number; assetId?: string; text?: string }[];
+    }[];
+  };
+  ui: { selectedClipId: string | null; playhead: number; playing: boolean; pxPerFrame: number; snap: boolean; leftTab: string };
+  history: { past: number; future: number };
+}
+
 export interface EditorDebugApi {
   version: string;
   support: () => Promise<Record<string, boolean>>;
   spike: (video: Blob) => Promise<SpikeResult>;
+  state: () => DebugState;
   [key: string]: unknown;
 }
 

@@ -16,9 +16,13 @@ export interface Support {
   fileSystemAccess: boolean;
 }
 
-/** 편집기를 아예 쓸 수 없는 환경인지 (R1.3 안내 화면) */
-export function isBlocked(s: Pick<Support, 'secureContext' | 'webcodecs'>): boolean {
-  return !s.secureContext || !s.webcodecs;
+/** 바로 확인할 수 있는 기본 조건: 보안 컨텍스트 + WebCodecs 클래스 존재 */
+export function basicSupport(): Pick<Support, 'secureContext' | 'webcodecs'> {
+  return {
+    secureContext: window.isSecureContext,
+    webcodecs:
+      typeof VideoEncoder !== 'undefined' && typeof VideoDecoder !== 'undefined' && typeof AudioEncoder !== 'undefined',
+  };
 }
 
 let cached: Promise<Support> | null = null;
@@ -26,9 +30,7 @@ let cached: Promise<Support> | null = null;
 export function detectSupport(): Promise<Support> {
   if (cached) return cached;
   cached = (async () => {
-    const secureContext = window.isSecureContext;
-    const webcodecs =
-      typeof VideoEncoder !== 'undefined' && typeof VideoDecoder !== 'undefined' && typeof AudioEncoder !== 'undefined';
+    const { secureContext, webcodecs } = basicSupport();
     const base = { width: 1080, height: 1920, frameRate: 30, bitrate: 10_000_000 };
     const safe = async (f: () => Promise<boolean>) => {
       try {

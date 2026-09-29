@@ -1,8 +1,10 @@
-/** 태스크 0 골격. 태스크 2에서 캡컷형 레이아웃으로 바뀐다. */
+import { basicSupport } from './support';
+import { Editor } from './ui/Editor';
+import { UnsupportedScreen } from './ui/UnsupportedScreen';
+
+/** WebCodecs가 없거나 보안 컨텍스트가 아니면 안내 화면 (R1.3) */
 export function App() {
-  return (
-    <main className="flex h-full items-center justify-center">
-      <h1 className="text-2xl font-bold">웹 영상 편집기</h1>
-    </main>
-  );
+  const { secureContext, webcodecs } = basicSupport();
+  if (!secureContext || !webcodecs) return <UnsupportedScreen insecure={!secureContext} />;
+  return <Editor />;
 }

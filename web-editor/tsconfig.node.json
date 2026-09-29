@@ -11,5 +11,5 @@
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "playwright.config.ts", "tests/e2e", "src/debug-types.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "playwright.config.ts", "tests/e2e", "src/debug-types.ts", "src/**/*.test.ts"]
 }

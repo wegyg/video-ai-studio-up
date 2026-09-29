@@ -16,6 +16,8 @@ export interface ProjectSnapshot {
 }
 
 export interface ProjectState extends ProjectSnapshot {
+  /** 이름 변경은 실행 취소 대상이 아니다 */
+  setName: (name: string) => void;
   setRatio: (ratio: Ratio) => void;
   addAsset: (asset: AssetMeta) => void;
   updateAsset: (id: string, patch: Partial<AssetMeta>) => void;
@@ -51,6 +53,7 @@ export const useProject = create<ProjectState>()(
       };
       return {
         ...createEmptyProject(),
+        setName: (name) => set({ name }),
         setRatio: (ratio) => apply((e) => (e.ratio === ratio ? e : { ...e, ratio })),
         addAsset: (asset) => set((s) => ({ assets: { ...s.assets, [asset.id]: asset } })),
         updateAsset: (id, patch) =>

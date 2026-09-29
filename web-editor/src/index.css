@@ -17,4 +17,6 @@ body {
   font-family: var(--font-sans);
   overflow: hidden;
   user-select: none;
+  /* 한글은 글자 단위가 아니라 띄어쓰기 단위로 줄바꿈 */
+  word-break: keep-all;
 }
