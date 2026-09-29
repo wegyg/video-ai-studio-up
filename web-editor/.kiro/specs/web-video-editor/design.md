@@ -210,3 +210,25 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
   - 원래 계획은 `actions/deploy-pages`였다. 이 방식은 저장소 설정 변경(Pages 소스를 "GitHub Actions"로 바꾸기, `github-pages` 환경의 브랜치 허용)이 필요한데, 샌드박스 인증으로는 설정 API가 403으로 거부되었다. `gh-pages` 브랜치 방식은 브랜치를 올리는 순간 Pages가 자동으로 켜져서(확인 완료: build_type=legacy, source=gh-pages) 사용자가 설정할 것이 없다.
   - 배포 확인: `DEPLOY_URL=… npx playwright test deployed`는 배포본이 로컬 최신 빌드와 같은지(번들 해시), https에서 편집기와 인코딩·글꼴이 되는지 검사한다.
 - README에 적을 다른 실행 방법: 로컬에서 `npx serve dist` 실행 후 Chrome으로 `http://localhost:3000` 열기. file://로 열면 WebCodecs가 동작하지 않으므로 앱이 안내 화면을 보여 준다(R1.3).
+
+
+---
+
+# 2단계·3단계 설계 메모 (확인 1 뒤 추가)
+
+## 13. WebGL 합성으로 전환 (태스크 11)
+효과를 셰이더로 구현해야 하므로 합성을 WebGL2로 바꾼다. 전환은 **1단계가 끝난 뒤**에 한다. 이유는 두 가지다. 태스크 6~10은 Canvas 2D로 충분하고, 태스크 10에서 만드는 "미리보기 = 내보내기 픽셀 비교" 테스트가 전환의 안전장치가 되기 때문이다.
+
+- `drawFrame(ctx, edit, frame, sources)`의 역할(미리보기·내보내기 공용 단일 합성 경로)은 그대로 두고 내부만 WebGL2 `Compositor`로 바꾼다. 미리보기는 `<canvas>`, 내보내기는 `OffscreenCanvas`를 쓴다.
+- 파이프라인: 클립 텍스처(`texImage2D`로 `<video>`/`ImageBitmap` 업로드) → 필터 체인(프레임버퍼 왕복) → 트랜지션 합성 → 출력.
+- 텍스트는 2D 캔버스에 그린 뒤 텍스처로 올린다(글꼴 렌더링은 브라우저에 맡긴다).
+- WebGL2를 만들 수 없으면 Canvas 2D 경로로 되돌아가고 효과 UI를 끈다(R13).
+
+## 14. 3단계 AI (로컬 실행)
+확인한 사실은 tasks.md 3단계 머리말에 적었다. 설계 요점만 둔다.
+
+- **실행 위치:** 전용 Worker. 편집을 막지 않고 취소할 수 있다.
+- **모델 캐시:** 한 번 내려받아 Cache API 또는 IndexedDB에 저장한다. 진행률은 바이트 기준으로 보여 준다(R0.2).
+- **Google 서버 의존 제거:** `@mediapipe/tasks-vision`의 WASM 런타임은 npm 패키지에 있으므로 우리 사이트에서 직접 호스팅한다. `.task` 모델 파일은 패키지에 없으므로 저장소에 넣거나 한 번 받아 캐시한다. 런타임에 Google 서버를 부르지 않는다(R0.1).
+- **Whisper 단어별 타이밍:** `onnx-community/whisper-*_timestamped` 저장소를 쓴다(일반 내보내기에는 단어 정렬에 필요한 출력이 없다). 모델 크기별 속도·정확도는 태스크 21 스파이크에서 한국어 음성으로 측정해 `docs/whisper.md`에 기록하고, 그 결과로 기본값을 정한다.
+- **WebGPU:** `device: 'webgpu'`를 우선 쓰고 안 되면 WASM으로 되돌아간다. `q4f16` 같은 fp16 계열 양자화는 WebGPU가 필요한지 스파이크에서 확인한다.
