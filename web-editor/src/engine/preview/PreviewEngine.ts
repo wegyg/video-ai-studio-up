@@ -19,7 +19,7 @@ import { useUI } from '../../store/ui';
 import { clipAt, drawFrame, type FrameSources } from '../compose';
 import { clipBox, containsPoint, textBox, type Box, type Point } from '../geometry';
 import { drawTextClip, layoutText } from '../text';
-import { ensureFont, type FontFamily, type FontWeight } from '../../fonts';
+import { ensureFont, isFontLoaded, type FontFamily, type FontWeight } from '../../fonts';
 
 const PRELOAD = 2 * FPS;
 const KEEP = FPS;
@@ -261,11 +261,18 @@ export class PreviewEngine {
       s.forgetTarget();
       if (s.audio && this.audio) s.audio.gain.gain.setTargetAtTime(0, this.audio.ctx.currentTime, 0.01);
     }
+    // 구간 미리 재생이었으면 원래 보던 곳으로 돌아간다
+    const range = useUI.getState().playRange;
+    if (range) {
+      useUI.getState().setPlayRange(null);
+      useUI.getState().setPlayhead(range.returnTo);
+    }
     this.invalidate();
   }
 
   /** 재생 중에 위치가 바뀌면(탐색) 시계를 새 위치에서 다시 시작 */
   private rebase(frame: number): void {
+    if (useUI.getState().playRange) useUI.getState().setPlayRange(null); // 사용자가 옮겼으면 미리 재생은 끝
     this.starting = true;
     this.frameBase = frame;
     this.startDeadline = performance.now() + START_WAIT_MS;
@@ -296,6 +303,11 @@ export class PreviewEngine {
     let frame: number;
     if (this.playing && !this.starting) {
       frame = this.frameBase + (this.now() - this.clockBase) * FPS;
+      const range = useUI.getState().playRange;
+      if (range && frame >= range.end) {
+        useUI.getState().setPlaying(false); // → stopPlayback가 returnTo로 되돌린다
+        return;
+      }
       if (frame >= total) {
         frame = total;
         this.setPlayheadSelf(total);
@@ -394,6 +406,11 @@ export class PreviewEngine {
   private ensureTextFont(family: FontFamily, weight: FontWeight): boolean {
     const key = `${family}:${weight}`;
     if (this.fontsReady.has(key)) return true;
+    // 미리 불러 둔 글꼴이면 이번 프레임에 바로 그린다 (프리셋을 누르자마자 보이게)
+    if (isFontLoaded(family, weight)) {
+      this.fontsReady.add(key);
+      return true;
+    }
     if (!this.fontsLoading.has(key)) {
       this.fontsLoading.add(key);
       ensureFont(family, weight).then(

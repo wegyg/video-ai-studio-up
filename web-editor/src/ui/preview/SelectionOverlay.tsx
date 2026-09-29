@@ -13,6 +13,7 @@ import { ko } from '../../i18n/ko';
 import { findClip } from '../../model/ops';
 import { RATIO_SIZE, type TextClip, type Transform } from '../../model/types';
 import { history } from '../../store/history';
+// (history는 드래그 제스처와 인라인 편집 모두에서 쓴다)
 import { useProject } from '../../store/project';
 import { useUI } from '../../store/ui';
 
@@ -44,18 +45,29 @@ function SafeAreaGuides() {
   );
 }
 
-/** 미리보기에서 두 번 눌러 글자를 바로 고치기 (R7.5) */
+/**
+ * 미리보기에서 두 번 눌러 글자를 바로 고치기 (R7.5).
+ * 치는 대로 캔버스에 반영되고(반투명 입력칸 뒤로 보인다), 끝나면 실행 취소 기록 1개. Esc는 처음 글자로 되돌린다.
+ */
 function InlineEditor({ clip, onDone }: { clip: TextClip; onDone: () => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const done = useRef(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    history.beginGesture();
     el.focus();
     el.select();
+    return () => {
+      if (!done.current) history.endGesture();
+    };
   }, []);
-  const commit = (save: boolean) => {
-    const v = ref.current?.value ?? '';
-    if (save && v !== clip.text) useProject.getState().updateClip(clip.id, (c) => ({ ...c, text: v }) as typeof c);
+  const setText = (v: string) => useProject.getState().updateClip(clip.id, (c) => ({ ...c, text: v }) as typeof c);
+  const finish = (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    if (save) history.endGesture();
+    else history.cancelGesture(); // 편집 전 상태로
     onDone();
   };
   return (
@@ -64,13 +76,14 @@ function InlineEditor({ clip, onDone }: { clip: TextClip; onDone: () => void }) 
       data-testid="inline-text-editor"
       aria-label={ko.textProps.content}
       defaultValue={clip.text}
-      onBlur={() => commit(true)}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => finish(true)}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === 'Escape') commit(false);
-        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) commit(true);
+        if (e.key === 'Escape') finish(false);
+        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) finish(true);
       }}
-      className="pointer-events-auto absolute inset-0 size-full resize-none rounded bg-black/70 p-1 text-center text-white outline-2 outline-cyan-300"
+      className="pointer-events-auto absolute inset-0 size-full resize-none rounded bg-black/25 p-1 text-center text-white/60 outline-2 outline-cyan-300"
       style={{ fontSize: 16 }}
     />
   );

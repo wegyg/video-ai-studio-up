@@ -5,6 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { history } from '../store/history';
+// TextAreaField도 history 제스처를 쓴다 (치는 동안 기록 멈춤 → 끝나면 1개)
 
 interface Common {
   label: string;
@@ -173,7 +174,10 @@ export function CheckField({ label, value, onCommit, testId }: { label: string; 
   );
 }
 
-/** 여러 줄 글자 입력 (Enter는 줄바꿈, 포커스가 떠날 때 적용) */
+/**
+ * 여러 줄 글자 입력. 치는 대로 미리보기에 바로 반영하고(한글 조합 중인 글자 포함),
+ * 칸을 벗어날 때 한 번에 실행 취소 기록 1개로 남긴다.
+ */
 export function TextAreaField({
   label,
   value,
@@ -192,6 +196,12 @@ export function TextAreaField({
   useEffect(() => {
     if (!editing.current) setText(value);
   }, [value]);
+  const finish = () => {
+    if (!editing.current) return;
+    editing.current = false;
+    history.endGesture();
+  };
+  useEffect(() => finish, []);
   return (
     <label className="flex flex-col gap-1 text-xs">
       <span className="text-neutral-400">{label}</span>
@@ -201,12 +211,15 @@ export function TextAreaField({
         rows={2}
         value={text}
         placeholder={placeholder}
-        onFocus={() => (editing.current = true)}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => {
-          editing.current = false;
-          onCommit(text);
+        onFocus={() => {
+          editing.current = true;
+          history.beginGesture();
         }}
+        onChange={(e) => {
+          setText(e.target.value);
+          onCommit(e.target.value); // 치는 대로 반영 (R7, G1)
+        }}
+        onBlur={finish}
         className="resize-y rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-neutral-100 focus:border-cyan-500 focus:outline-none"
       />
     </label>

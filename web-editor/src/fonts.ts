@@ -28,6 +28,10 @@ export function fontUrl(family: FontFamily, weight: FontWeight): string {
 type FontSet = FontFaceSet & { add(font: FontFace): FontFaceSet };
 
 const loaded = new Map<string, Promise<void>>();
+const done = new Set<string>();
+
+/** 이미 다 불러온 글꼴인지 (기다리지 않고 바로 알 수 있다) */
+export const isFontLoaded = (family: FontFamily, weight: FontWeight): boolean => done.has(`${family}:${weight}`);
 
 /** 글꼴 하나를 등록하고 불러온다. 같은 글꼴은 한 번만 불러온다. */
 export function ensureFont(family: FontFamily, weight: FontWeight, set: FontSet = document.fonts as FontSet): Promise<void> {
@@ -36,7 +40,9 @@ export function ensureFont(family: FontFamily, weight: FontWeight, set: FontSet 
   if (!p) {
     const face = new FontFace(family, `url(${URLS[family][weight]})`, { weight: String(weight), style: 'normal' });
     set.add(face);
-    p = face.load().then(() => undefined);
+    p = face.load().then(() => {
+      done.add(key);
+    });
     loaded.set(key, p);
   }
   return p;

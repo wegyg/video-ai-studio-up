@@ -47,7 +47,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       },
     });
     jobRef.current = job;
-    await job.start();
+    await job.run();
   };
 
   const pct = progress ? Math.round(progress.ratio * 100) : 0;

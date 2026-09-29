@@ -18,8 +18,14 @@ export interface UIState {
   /** 쇼츠 안전 영역 안내선 표시 (R7.9) */
   safeArea: boolean;
   leftTab: LeftTab;
+  /**
+   * 구간 미리 재생 (애니메이션을 고르면 그 부분만 한 번 보여 준다).
+   * 재생이 end에 닿거나 멈추면 returnTo로 돌아간다.
+   */
+  playRange: { end: number; returnTo: number } | null;
   select: (id: string | null) => void;
   setSafeArea: (on: boolean) => void;
+  setPlayRange: (r: { end: number; returnTo: number } | null) => void;
   setPlayhead: (frame: number) => void;
   setPlaying: (playing: boolean) => void;
   setZoom: (pxPerFrame: number) => void;
@@ -37,8 +43,10 @@ export const useUI = create<UIState>()((set) => ({
   snap: true,
   safeArea: false,
   leftTab: 'media',
+  playRange: null,
   select: (id) => set({ selectedClipId: id }),
   setSafeArea: (on) => set({ safeArea: on }),
+  setPlayRange: (r) => set({ playRange: r }),
   setPlayhead: (frame) => set({ playhead: Math.max(0, Math.round(frame)) }),
   setPlaying: (playing) => set({ playing }),
   setZoom: (z) => set({ pxPerFrame: clampZoom(z) }),

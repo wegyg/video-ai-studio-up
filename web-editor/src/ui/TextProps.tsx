@@ -1,4 +1,5 @@
 /** 우측 속성 패널의 텍스트 서식 (R7.2~R7.4, R7.7) */
+import { actions } from '../actions';
 import { ko } from '../i18n/ko';
 import { FONT_FAMILIES } from '../fonts';
 import { FPS, type Clip, type TextAlign, type TextAnim, type TextAnimType, type TextClip, type TextFont, type TextWeight } from '../model/types';
@@ -19,8 +20,16 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
 }
 
 export function TextProps({ clip }: { clip: TextClip }) {
-  const set = (patch: Partial<TextClip>) => useProject.getState().updateClip(clip.id, (c) => ({ ...c, ...patch }) as Clip);
-  const setAnim = (key: 'animIn' | 'animOut', patch: Partial<TextAnim>) => set({ [key]: { ...clip[key], ...patch } } as Partial<TextClip>);
+  // 서식을 바꾸면 결과가 보이도록 플레이헤드를 클립 안으로 옮긴다 (G1)
+  const set = (patch: Partial<TextClip>) => {
+    useProject.getState().updateClip(clip.id, (c) => ({ ...c, ...patch }) as Clip);
+    actions.revealClip(clip.id);
+  };
+  // 애니메이션을 바꾸면 그 부분을 한 번 재생해 보여 준다
+  const setAnim = (key: 'animIn' | 'animOut', patch: Partial<TextAnim>) => {
+    useProject.getState().updateClip(clip.id, (c) => ({ ...c, [key]: { ...clip[key], ...patch } }) as Clip);
+    actions.previewTextAnim(clip.id, key === 'animIn' ? 'in' : 'out');
+  };
   const animOptions = ANIM_TYPES.map((t) => ({ value: t, label: ko.textProps.anims[t] }));
 
   return (

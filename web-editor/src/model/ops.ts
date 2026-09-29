@@ -77,8 +77,10 @@ export function createTextClip(start: number, text: string, style: TextStyle = T
     duration: TEXT_DEFAULT_FRAMES,
     text,
     ...structuredClone(style),
-    animIn: { type: 'fade', duration: TEXT_ANIM_FRAMES },
-    animOut: { type: 'fade', duration: TEXT_ANIM_FRAMES },
+    // 기본은 애니메이션 없음: 추가한 순간(첫 프레임)부터 글자가 보여야 한다.
+    // 페이드로 시작하면 첫 프레임이 투명이라 "눌렀는데 아무것도 안 보이는" 상태가 된다 (G1)
+    animIn: { type: 'none', duration: TEXT_ANIM_FRAMES },
+    animOut: { type: 'none', duration: TEXT_ANIM_FRAMES },
     transform: { ...DEFAULT_TRANSFORM },
   };
 }

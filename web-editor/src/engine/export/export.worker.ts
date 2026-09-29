@@ -23,7 +23,7 @@ import {
   type InputVideoTrack,
   type WrappedCanvas,
 } from 'mediabunny';
-import { clipAt, drawFrame, type FrameSources, type VisualSource } from '../compose';
+import { baseSize, clipAt, drawFrame, type FrameSources, type VisualSource } from '../compose';
 import { drawTextClip } from '../text';
 import type { Clip, EditState, MediaClip } from '../../model/types';
 import type { ExportMessage, ExportRequest } from './protocol';
@@ -100,9 +100,9 @@ async function run(req: ExportRequest): Promise<void> {
   }
   await loadFonts(req);
 
-  // 원본별 입력 준비 (영상은 CanvasSink, 이미지는 ImageBitmap)
+  // 원본별 입력 준비 (영상은 트랙과 표시 크기, 이미지는 ImageBitmap)
   const inputs: Input[] = [];
-  const sinks = new Map<string, { sink: CanvasSink; track: InputVideoTrack }>();
+  const videos = new Map<string, { track: InputVideoTrack; width: number; height: number }>();
   const images = new Map<string, ImageBitmap>();
   const edit: EditState = req.project.edit;
 
@@ -119,24 +119,27 @@ async function run(req: ExportRequest): Promise<void> {
       const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
       inputs.push(input);
       const track = await input.getPrimaryVideoTrack();
-      if (track) sinks.set(assetId, { sink: new CanvasSink(track, { poolSize: 2 }), track });
+      if (track) videos.set(assetId, { track, width: await track.getDisplayWidth(), height: await track.getDisplayHeight() });
     }
   }
 
   const canvas = new OffscreenCanvas(W, H);
   const ctx = canvas.getContext('2d', { alpha: false })!;
+  const seconds = totalFrames / fps;
+  // 'reserve'는 파일 앞에 목차(moov) 자리를 비워 두고 쓰는 방식이라, 파일에 바로 써도 Fast Start MP4가 된다.
+  // 휴대폰·SNS 업로드에서 앞부분만 받아도 바로 재생된다. 대신 패킷 수 상한을 알려 줘야 한다(33% 여유).
   const target = req.writable ? new StreamTarget(req.writable) : new BufferTarget();
-  const output = new Output({ format: new Mp4OutputFormat({ fastStart: req.writable ? false : 'in-memory' }), target });
+  const output = new Output({ format: new Mp4OutputFormat({ fastStart: req.writable ? 'reserve' : 'in-memory' }), target });
   const videoSource = new CanvasSource(canvas, {
     codec: 'avc',
     bitrate: req.videoBitrate,
     hardwareAcceleration: 'no-preference',
   });
-  output.addVideoTrack(videoSource, { frameRate: fps });
+  output.addVideoTrack(videoSource, { frameRate: fps, maximumPacketCount: Math.ceil(totalFrames * 1.34) + 10 });
 
   const audio = req.audio;
   const audioSource = audio ? new AudioSampleSource({ codec: 'aac', bitrate: req.audioBitrate }) : null;
-  if (audioSource) output.addAudioTrack(audioSource);
+  if (audioSource) output.addAudioTrack(audioSource, { maximumPacketCount: Math.ceil(seconds * 100 * 1.34) + 10 });
 
   const readers = new Map<string, ClipReader>();
   const cleanup = async () => {
@@ -150,18 +153,39 @@ async function run(req: ExportRequest): Promise<void> {
   try {
     await output.start();
 
-    /** 이 클립의 원본 프레임을 준비한다 */
+    /**
+     * 이 클립의 원본 프레임을 준비한다. 클립마다 따로 디코더를 둔다(같은 원본을 두 트랙에서 동시에 써도 섞이지 않게).
+     * 디코딩 크기는 실제로 화면에 그려질 크기로 줄인다 — 4K 원본을 4K로 풀었다가 다시 줄이는 낭비를 없앤다.
+     */
     const readerFor = (clip: MediaClip): ClipReader | null => {
       let r = readers.get(clip.id);
       if (!r) {
-        const s = sinks.get(clip.assetId);
-        if (!s) return null;
+        const v = videos.get(clip.assetId);
+        if (!v) return null;
+        const drawn = baseSize(v.width, v.height, W, H);
+        const k = Math.min(1, (drawn.w * Math.max(0.05, clip.transform.scale)) / v.width);
+        const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+        const sink =
+          k > 0.95
+            ? new CanvasSink(v.track, { poolSize: 2 })
+            : new CanvasSink(v.track, { width: even(v.width * k), height: even(v.height * k), fit: 'fill', poolSize: 2 });
         const startSec = clip.inPoint / fps;
         const endSec = (clip.inPoint + clip.duration) / fps + 1 / fps;
-        r = new ClipReader(s.sink, startSec, endSec);
+        r = new ClipReader(sink, startSec, endSec);
         readers.set(clip.id, r);
       }
       return r;
+    };
+    /** 끝난 클립의 디코더를 닫아 메모리를 돌려준다 */
+    const closeFinished = async (frame: number) => {
+      for (const track of edit.tracks) {
+        for (const c of track.clips) {
+          if (c.start + c.duration <= frame && readers.has(c.id)) {
+            await readers.get(c.id)!.close();
+            readers.delete(c.id);
+          }
+        }
+      }
     };
 
     // 프레임마다 필요한 원본 그림을 미리 받아 둔 뒤 그린다 (drawFrame은 동기 함수)
@@ -184,9 +208,9 @@ async function run(req: ExportRequest): Promise<void> {
         }
         const t = (clip.inPoint + (frame - clip.start)) / fps;
         const wrapped = await reader.at(t);
-        const displayW = await sinks.get(clip.assetId)!.track.getDisplayWidth();
-        const displayH = await sinks.get(clip.assetId)!.track.getDisplayHeight();
-        pending.set(clip.id, wrapped ? { image: wrapped.canvas, width: displayW, height: displayH } : null);
+        const v = videos.get(clip.assetId)!;
+        // 크기는 원본 표시 크기로 넘긴다 → 줄여서 디코딩했어도 배치 계산은 미리보기와 같다
+        pending.set(clip.id, wrapped ? { image: wrapped.canvas, width: v.width, height: v.height } : null);
       }
     };
 
@@ -225,7 +249,10 @@ async function run(req: ExportRequest): Promise<void> {
       drawFrame(ctx, edit, frame, sources);
       // await가 인코더의 속도에 맞춰 준다 (메모리가 무한히 늘지 않는다)
       await videoSource.add(frame / fps, 1 / fps);
-      if (frame % fps === fps - 1) await sendAudioUpTo((frame + 1) / fps);
+      if (frame % fps === fps - 1) {
+        await sendAudioUpTo((frame + 1) / fps);
+        await closeFinished(frame + 1);
+      }
       if (frame % 5 === 0 || frame === totalFrames - 1) {
         port.postMessage({ type: 'progress', frames: frame + 1, total: totalFrames, stage: 'video' });
       }

@@ -82,15 +82,50 @@ export const actions = {
   /**
    * 스타일 프리셋 적용 (R7.6). 텍스트 클립이 선택돼 있으면 그 클립에, 없으면 새로 만든다.
    * 글자 내용·시간·위치는 건드리지 않는다.
+   * 플레이헤드가 그 클립 밖에 있으면 결과가 안 보이므로 클립 안으로 옮긴다 (G1).
    */
   applyTextPreset(style: TextStyle): string | null {
     const selected = useUI.getState().selectedClipId;
     const loc = selected ? findClip(useProject.getState().edit, selected) : null;
     if (loc && loc.clip.type === 'text') {
       useProject.getState().updateClip(loc.clip.id, (c) => ({ ...c, ...structuredClone(style) }));
+      actions.revealClip(loc.clip.id);
       return loc.clip.id;
     }
     return actions.addTextClip(style);
+  },
+  /** 플레이헤드가 클립 밖이면 클립이 보이는 첫 프레임(등장 효과가 끝난 뒤)으로 옮긴다 */
+  revealClip(clipId: string): void {
+    const loc = findClip(useProject.getState().edit, clipId);
+    if (!loc) return;
+    const c = loc.clip;
+    const ui = useUI.getState();
+    if (ui.playhead >= c.start && ui.playhead < clipEnd(c)) return;
+    const settle = c.type === 'text' && c.animIn.type !== 'none' ? c.animIn.duration : 0;
+    ui.setPlayhead(Math.min(clipEnd(c) - 1, c.start + settle));
+  },
+  /**
+   * 텍스트 애니메이션을 고르면 그 부분만 한 번 재생해 보여 준다 (G1: 설명 없이 바로 결과가 보이게).
+   * 끝나면 원래 보던 위치로 돌아간다.
+   */
+  previewTextAnim(clipId: string, which: 'in' | 'out'): void {
+    const loc = findClip(useProject.getState().edit, clipId);
+    if (!loc || loc.clip.type !== 'text') return;
+    const c = loc.clip;
+    const anim = which === 'in' ? c.animIn : c.animOut;
+    if (anim.type === 'none' || anim.duration <= 0) {
+      actions.revealClip(clipId);
+      return;
+    }
+    const ui = useUI.getState();
+    const HOLD = 9; // 효과가 끝난 모습을 0.3초 더 보여 준다
+    const returnTo = ui.playhead >= c.start && ui.playhead < clipEnd(c) ? ui.playhead : c.start + (which === 'in' ? anim.duration : 0);
+    const start = which === 'in' ? c.start : Math.max(c.start, clipEnd(c) - anim.duration - HOLD);
+    const end = which === 'in' ? Math.min(clipEnd(c), c.start + anim.duration + HOLD) : clipEnd(c);
+    if (ui.playing) ui.setPlaying(false);
+    ui.setPlayhead(start);
+    ui.setPlayRange({ end, returnTo });
+    ui.setPlaying(true);
   },
   /**
    * 미디어를 타임라인에 넣는다 (R4.5). 트랙을 주지 않으면 기본 트랙(영상/이미지 → 메인 영상 트랙),

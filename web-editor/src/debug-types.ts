@@ -99,6 +99,8 @@ export interface EditorDebugApi {
   clipBox: (clipId?: string) => { cx: number; cy: number; w: number; h: number; rotation: number } | null;
   /** 미리보기가 이 클립에 적용 중인 소리 크기 (GainNode 값) */
   clipGain: (clipId: string) => number | null;
+  /** 미리보기 캔버스 해상도를 강제로 바꾼다 (진단용: 해상도 차이인지 내용 차이인지 가르기) */
+  setPreviewResolution: (w: number, h: number) => void;
   /** 지금 상태를 바로 저장한다 (자동 저장을 기다리지 않고) */
   saveNow: () => Promise<void>;
   /** 저장이 몇 번 일어났는지 */
@@ -111,6 +113,12 @@ export interface EditorDebugApi {
   previewPixels: (points: [number, number][]) => number[][];
   /** 마지막으로 내보낸 MP4의 바이트 수 */
   lastExportBytes: () => number;
+  /** 브라우저 전용 저장소(OPFS)에 쓴 MP4를 검사한다 — 파일에 바로 쓰는 저장 경로 확인용 */
+  inspectOpfsFile: (name: string) => Promise<{
+    bytes: number;
+    boxes: string[];
+    info: { videoCodec: string | null; audioCodec: string | null; width: number; height: number; frameCount: number; videoDuration: number };
+  }>;
   /** 마지막으로 내보낸 MP4를 다시 읽어 정보와 픽셀을 꺼낸다 (G3 검증) */
   verifyLastExport: (
     times: number[],

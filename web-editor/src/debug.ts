@@ -60,6 +60,7 @@ export const debugApi: EditorDebugApi = {
   }),
   preview: () => previewRef.current?.stats() ?? null,
   clipGain: (clipId) => previewRef.current?.clipGain(clipId) ?? null,
+  setPreviewResolution: (w, h) => previewRef.current?.resize(w, h, 1),
   saveNow: () => saveNow(),
   savedTimes: () => savedTimes(),
   projectFile: () => toProjectFile(),
@@ -89,6 +90,25 @@ export const debugApi: EditorDebugApi = {
     return (await import('./dev/verify-export')).exportedPixels(buffer, times, points);
   },
   lastExportBytes: () => lastExportBuffer()?.byteLength ?? 0,
+  inspectOpfsFile: async (name) => {
+    const root = await navigator.storage.getDirectory();
+    const file = await (await root.getFileHandle(name)).getFile();
+    const buf = await file.arrayBuffer();
+    // MP4 맨 위 상자 순서 (moov가 mdat보다 앞이면 Fast Start)
+    const view = new DataView(buf);
+    const boxes: string[] = [];
+    for (let i = 0; i + 8 <= buf.byteLength; ) {
+      let size = view.getUint32(i);
+      const type = String.fromCharCode(view.getUint8(i + 4), view.getUint8(i + 5), view.getUint8(i + 6), view.getUint8(i + 7));
+      if (size === 1) size = Number(view.getBigUint64(i + 8));
+      if (size === 0) size = buf.byteLength - i;
+      boxes.push(type);
+      if (size < 8) break;
+      i += size;
+    }
+    const { info } = await (await import('./dev/verify-export')).exportedPixels(buf, [0.5], [[0.5, 0.5]]);
+    return { bytes: buf.byteLength, boxes, info };
+  },
 };
 
 export function installDebugApi(): void {

@@ -61,6 +61,20 @@ function fileNameFor(name: string): string {
 }
 
 /**
+ * 파일 쓰기 스트림(FileSystemWritableFileStream)은 Chrome이 Worker로 넘기지 못하게 막는다
+ * ("could not be cloned"). 그래서 메인 스레드에 보통 WritableStream을 하나 만들어 파일 스트림에 이어 주고,
+ * 그 보통 스트림을 Worker로 넘긴다(보통 스트림은 넘길 수 있다). 위치 지정 쓰기와 속도 조절은 그대로 된다.
+ */
+export function relayToFile(file: FileSystemWritableFileStream): WritableStream {
+  return new WritableStream({
+    // Mediabunny StreamTarget이 넘기는 조각: { type: 'write', data, position } — 파일 스트림이 그대로 받는 형식
+    write: (chunk: { type: 'write'; data: Uint8Array<ArrayBuffer>; position: number }) => file.write(chunk),
+    close: () => file.close(),
+    abort: (reason) => file.abort(reason),
+  });
+}
+
+/**
  * 마지막으로 내보낸 파일의 바이트 (다운로드로 저장한 경우).
  * 테스트가 "내려받은 파일과 같은 바이트"로 미리보기와 비교하는 데 쓴다 (G3).
  */
@@ -109,14 +123,7 @@ export class ExportJob {
       url: new URL(fontUrl(f.family as TextFont, f.weight as TextWeight), location.href).href,
     }));
 
-    let audio = null;
-    try {
-      audio = await mixExportAudio(edit, p.assets, blobs, totalFrames);
-    } catch (e) {
-      console.warn('[export] 소리 합치기 실패, 소리 없이 내보냅니다', e);
-    }
-
-    // 저장 위치: 고를 수 있으면 파일에 바로 쓴다
+    // 1) 저장 위치 고르기 — 사용자가 고르는 시간은 "내보내기 시간"에 넣지 않는다
     const fileName = fileNameFor(p.name);
     let writable: WritableStream | undefined;
     const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
@@ -126,7 +133,7 @@ export class ExportJob {
           suggestedName: fileName,
           types: [{ description: 'MP4', accept: { 'video/mp4': ['.mp4'] } }],
         });
-        writable = await handle.createWritable();
+        writable = relayToFile(await handle.createWritable());
       } catch (e) {
         if ((e as DOMException)?.name === 'AbortError') {
           this.handlers.onCanceled?.();
@@ -134,6 +141,21 @@ export class ExportJob {
         }
         writable = undefined; // 권한이 없으면 다운로드로
       }
+    }
+
+    // 2) 여기서부터 걸린 시간을 잰다 (소리 합치기 + 영상 만들기 + 마무리 전부) — 화면에 보이는 값
+    this.startedAt = performance.now();
+    this.samples = [];
+    let audio = null;
+    try {
+      audio = await mixExportAudio(edit, p.assets, blobs, totalFrames);
+    } catch (e) {
+      console.warn('[export] 소리 합치기 실패, 소리 없이 내보냅니다', e);
+    }
+    if (this.canceledByUser) {
+      await writable?.abort().catch(() => undefined);
+      this.handlers.onCanceled?.();
+      return;
     }
 
     const worker = new Worker(new URL('./export.worker.ts', import.meta.url), { type: 'module' });
@@ -161,6 +183,16 @@ export class ExportJob {
     if (writable) transfer.push(writable);
     if (audio) transfer.push(audio.interleaved.buffer);
     worker.postMessage(req, transfer);
+  }
+
+  /** start()의 어떤 단계에서 실패해도 "0%에서 멈춘 창"이 되지 않게 오류로 알린다 */
+  async run(): Promise<void> {
+    try {
+      await this.start();
+    } catch (e) {
+      this.finish();
+      this.handlers.onError?.(e instanceof Error ? e.message : String(e));
+    }
   }
 
   private onMessage(m: ExportMessage, info: { fileName: string; downloaded: boolean; seconds: number }): void {
@@ -191,7 +223,9 @@ export class ExportJob {
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 30_000);
       }
-      this.handlers.onDone?.({ bytes: m.bytes, ms: m.ms, fileName: info.fileName, downloaded: info.downloaded, seconds: info.seconds });
+      // 화면에 보여 줄 시간 = 시작 버튼을 누른 뒤(저장 위치를 고른 뒤)부터 파일이 완성될 때까지 전부
+      const ms = Math.round(performance.now() - this.startedAt);
+      this.handlers.onDone?.({ bytes: m.bytes, ms, fileName: info.fileName, downloaded: info.downloaded, seconds: info.seconds });
     } else if (m.type === 'canceled') {
       this.finish();
       this.handlers.onCanceled?.();
@@ -204,7 +238,7 @@ export class ExportJob {
 
   cancel(): void {
     this.canceledByUser = true;
-    this.worker?.postMessage({ type: 'cancel' });
+    this.worker?.postMessage({ type: 'cancel' }); // Worker가 아직 없으면(소리 합치는 중) start()가 멈춘다
   }
 
   private finish(): void {
