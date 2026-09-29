@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { actions } from '../actions';
+import { ExportDialog } from './ExportDialog';
 import { ko, withKey } from '../i18n/ko';
 import { useCanRedo, useCanUndo } from '../store/history';
 import { useProject } from '../store/project';
@@ -10,6 +12,7 @@ export function TopBar() {
   const name = useProject((s) => s.name);
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
+  const [exporting, setExporting] = useState(false);
   return (
     <header className="flex h-11 shrink-0 items-center gap-3 border-b border-neutral-800 bg-neutral-900 px-3">
       <span className="text-sm font-bold text-cyan-400">{ko.app.title}</span>
@@ -28,6 +31,15 @@ export function TopBar() {
       <IconButton label={ko.topbar.redo} tooltip={withKey(ko.topbar.redo, ko.keys.redo)} disabled={!canRedo} onClick={actions.redo} testId="redo">
         <IconRedo />
       </IconButton>
+      <button
+        type="button"
+        data-testid="open-export"
+        onClick={() => setExporting(true)}
+        className="ml-2 h-8 rounded-md bg-cyan-600 px-3 text-sm font-bold text-white hover:bg-cyan-500"
+      >
+        {ko.exportPanel.open}
+      </button>
+      {exporting && <ExportDialog onClose={() => setExporting(false)} />}
     </header>
   );
 }

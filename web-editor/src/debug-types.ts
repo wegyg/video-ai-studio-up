@@ -107,6 +107,27 @@ export interface EditorDebugApi {
   projectFile: () => unknown;
   /** 미디어를 목록에서 지운다 (그 미디어를 쓰는 클립도 지워진다) */
   removeAsset: (id: string) => void;
+  /** 미리보기 캔버스에서 여러 좌표(0~1 비율)의 픽셀을 한 번에 읽는다 */
+  previewPixels: (points: [number, number][]) => number[][];
+  /** 마지막으로 내보낸 MP4의 바이트 수 */
+  lastExportBytes: () => number;
+  /** 마지막으로 내보낸 MP4를 다시 읽어 정보와 픽셀을 꺼낸다 (G3 검증) */
+  verifyLastExport: (
+    times: number[],
+    points: [number, number][],
+  ) => Promise<{
+    info: {
+      videoCodec: string | null;
+      audioCodec: string | null;
+      width: number;
+      height: number;
+      duration: number;
+      videoDuration: number;
+      frameCount: number;
+      frameRate: number;
+    };
+    frames: { time: number; pixels: number[][] }[];
+  }>;
   [key: string]: unknown;
 }
 

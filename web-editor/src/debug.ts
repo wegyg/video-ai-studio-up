@@ -1,6 +1,7 @@
 /** 테스트용 창구: window.__editor. 편집기 내부 상태를 읽기 전용 데이터로 노출한다. */
 import type { EditorDebugApi } from './debug-types';
 import { previewRef } from './engine/preview/PreviewEngine';
+import { lastExportBuffer } from './engine/export';
 import { saveNow, savedTimes } from './storage/persist';
 import { toProjectFile } from './storage/project-json';
 import { useMedia } from './media/store';
@@ -72,6 +73,22 @@ export const debugApi: EditorDebugApi = {
     const d = c.getContext('2d')!.getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data;
     return [d[0], d[1], d[2]];
   },
+  previewPixels: (points) => {
+    const c = document.querySelector<HTMLCanvasElement>('[data-testid=preview-canvas]')!;
+    const ctx = c.getContext('2d')!;
+    return points.map(([fx, fy]) => {
+      const x = Math.min(c.width - 1, Math.max(0, Math.floor(c.width * fx)));
+      const y = Math.min(c.height - 1, Math.max(0, Math.floor(c.height * fy)));
+      const d = ctx.getImageData(x, y, 1, 1).data;
+      return [d[0], d[1], d[2]];
+    });
+  },
+  verifyLastExport: async (times, points) => {
+    const buffer = lastExportBuffer();
+    if (!buffer) throw new Error('내보낸 파일이 없습니다');
+    return (await import('./dev/verify-export')).exportedPixels(buffer, times, points);
+  },
+  lastExportBytes: () => lastExportBuffer()?.byteLength ?? 0,
 };
 
 export function installDebugApi(): void {

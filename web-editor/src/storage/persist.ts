@@ -10,6 +10,7 @@ import type { AssetMeta } from '../model/types';
 import { useProject, type ProjectSnapshot } from '../store/project';
 import { useUI } from '../store/ui';
 import { allProjects, getMeta, getProject, isQuotaError, putMeta, putProject, storageEstimate, deleteUnreferenced } from './db';
+import { loadWorkTime, markActive, workElapsedMs } from './work-timer';
 
 export const SAVE_DEBOUNCE_MS = 400;
 const LAST_ID = 'lastProjectId';
@@ -20,6 +21,8 @@ export interface SavedProject {
   project: ProjectSnapshot;
   /** 화면 상태(되살리면 편하지만 편집 내용은 아님) */
   view: { playhead: number; pxPerFrame: number; snap: boolean; safeArea: boolean };
+  /** 이 영상을 만드는 데 실제로 작업한 시간(ms) — 완료 기준 G5 측정용 */
+  workMs?: number;
   updatedAt: number;
 }
 
@@ -30,6 +33,7 @@ export function snapshot(): SavedProject {
     version: 1,
     project: { id: p.id, name: p.name, assets: p.assets, edit: p.edit },
     view: { playhead: u.playhead, pxPerFrame: u.pxPerFrame, snap: u.snap, safeArea: u.safeArea },
+    workMs: workElapsedMs(),
     updatedAt: Date.now(),
   };
 }
@@ -72,7 +76,10 @@ export function startAutosave(): () => void {
     timer = window.setTimeout(() => void saveNow().catch(() => undefined), SAVE_DEBOUNCE_MS);
   };
   const unsubProject = useProject.subscribe((s, p) => {
-    if (s.edit !== p.edit || s.assets !== p.assets || s.name !== p.name || s.id !== p.id) schedule();
+    if (s.edit !== p.edit || s.assets !== p.assets || s.name !== p.name || s.id !== p.id) {
+      markActive(); // 실제로 편집한 시간만 쌓는다 (G5)
+      schedule();
+    }
   });
   const unsubUI = useUI.subscribe((s, p) => {
     if (s.playhead !== p.playhead || s.pxPerFrame !== p.pxPerFrame || s.snap !== p.snap || s.safeArea !== p.safeArea) schedule();
@@ -109,6 +116,7 @@ export async function loadLast(): Promise<SavedProject | null> {
  */
 export async function restore(saved: SavedProject): Promise<{ missing: AssetMeta[] }> {
   useProject.getState().replaceProject(saved.project);
+  loadWorkTime(saved.project.id, saved.workMs ?? 0);
   const u = useUI.getState();
   u.setPlayhead(saved.view.playhead);
   u.setZoom(saved.view.pxPerFrame);

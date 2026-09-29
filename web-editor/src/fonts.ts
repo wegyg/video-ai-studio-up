@@ -20,6 +20,11 @@ const URLS: Record<FontFamily, Record<FontWeight, string>> = {
   'Noto Sans KR': { 400: noto400, 700: noto700, 900: noto900 },
 };
 
+/** 글꼴 파일 주소 (내보내기 Worker에 절대 주소로 넘길 때 쓴다) */
+export function fontUrl(family: FontFamily, weight: FontWeight): string {
+  return URLS[family][weight];
+}
+
 type FontSet = FontFaceSet & { add(font: FontFace): FontFaceSet };
 
 const loaded = new Map<string, Promise<void>>();
