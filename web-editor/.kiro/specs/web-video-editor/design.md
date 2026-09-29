@@ -14,7 +14,7 @@
 | zundo | 2.3.0 | 실행 취소/다시 실행 (`temporal` 미들웨어) | github.com/charkour/zundo README |
 | mediabunny | 1.60.0 | MP4 읽기(디코딩)/쓰기(인코딩, 먹싱) | mediabunny.dev/guide/* |
 | @mediabunny/aac-encoder | 1.60.0 | AAC 인코딩 대체(WASM) | mediabunny.dev/guide/extensions/aac-encoder |
-| @ffmpeg/ffmpeg, @ffmpeg/util | 0.12.15, 0.12.2 | WebCodecs가 없을 때만 쓰는 대체 인코더 | ffmpegwasm.netlify.app |
+| @ffmpeg/ffmpeg, @ffmpeg/util | 0.12.15, 0.12.2 | *(2단계)* WebCodecs가 없을 때만 쓰는 대체 인코더. 1단계에서는 설치하지 않는다 | ffmpegwasm.netlify.app |
 | idb | 8.0.3 | IndexedDB 래퍼 | — |
 | pretendard | 1.3.9 | 글꼴 (앱에 포함) | — |
 | @playwright/test | 1.63.0 | E2E 테스트 | playwright.dev |
@@ -29,15 +29,15 @@ TypeScript 7과 Vite 8은 메이저 버전이 새로 올라간 상태다. 태스
 - 기능 확인: `canEncodeVideo('avc', { width, height, frameRate, quality })`, `canEncodeAudio('aac', ...)`
 - AAC 대체: `if (!(await canEncodeAudio('aac'))) registerAacEncoder()`
 
-구현하면서 문서로 추가 확인할 항목: `CanvasSource`에 하드웨어 가속 옵션(`hardwareAcceleration`)을 넘기는 방법, 프록시 생성용 `Conversion` API의 해상도 옵션, zundo의 `pause()`/`resume()`. 확인하기 전에는 쓰지 않는다.
+구현하면서 문서로 추가 확인할 항목: `CanvasSource`에 하드웨어 가속 옵션(`hardwareAcceleration`)을 넘기는 방법, zundo의 `pause()`/`resume()`. 프록시(보류)를 진행하게 되면 `Conversion` API의 해상도 옵션도 확인한다. 확인하기 전에는 쓰지 않는다.
 
 ## 2. 확인된 위험과 대응
 | 위험 | 근거 | 대응 |
 |------|------|------|
-| Playwright 기본 Chromium(오픈소스 빌드)에는 H.264/AAC 같은 독점 코덱이 없다 | Playwright 이슈 #36550 등, 메인테이너 답변 | 테스트 프로젝트를 둘로 나눈다. ① `chromium`(요구사항의 기본 테스트): VP9/Opus로 인코딩한 .mp4 테스트 파일을 쓰고, 내보내기는 앱에 있는 기능 확인과 대체 경로를 탄다. ② `chrome`(`channel: 'chrome'`, 실제 Google Chrome): H.264/AAC 테스트 파일로 사용자 환경과 같은 경로를 검증한다 |
+| Playwright 기본 Chromium(오픈소스 빌드)에는 H.264/AAC 같은 독점 코덱이 없다 | Playwright 이슈 #36550 등, 메인테이너 답변 | Playwright는 `chrome` 채널(`channel: 'chrome'`, 실제 Google Chrome, Chromium 엔진) 프로젝트 하나만 쓴다. H.264/AAC 테스트 파일로 사용자 환경과 같은 경로를 검증한다. ffmpeg.wasm 대체 경로는 2단계로 옮겼으므로 번들 Chromium은 쓰지 않는다 |
 | Linux Chrome의 WebCodecs에는 AAC 인코더가 없을 수 있다 (Windows Chrome은 OS 인코더를 쓴다) | Mediabunny 문서: "일부 브라우저에는 AAC 인코딩이 없다" | `canEncodeAudio('aac')`가 false이면 `@mediabunny/aac-encoder`를 등록한다 |
-| 오픈소스 Chromium에서 WebCodecs H.264 **인코딩** 지원 여부가 불확실하다 | 확인하지 못함 | 태스크 0 스파이크에서 실제로 확인한다. 지원하지 않으면 ffmpeg.wasm 대체 경로로 테스트한다(R11.4 검증 겸용) |
-| 개발 환경(Linux)과 사용자 환경(Windows Chrome)이 다르다 | — | CI에 `windows-latest` + Chrome으로 Playwright를 돌리는 작업을 추가한다. Windows용 결과물은 만들지 않고 검증만 한다 |
+| Linux Chrome에서 WebCodecs H.264 **인코딩** 지원 여부를 확인하지 못했다 | 확인하지 못함 | 태스크 0 스파이크에서 샌드박스와 CI(ubuntu) Chrome으로 실제로 확인하고 `docs/spike.md`에 기록한다 |
+| 개발/CI 환경(Linux)과 사용자 환경(Windows Chrome)이 다르다 | — | CI는 ubuntu + Chrome만 쓴다(Windows CI 없음). 대신 태스크 5와 10 뒤에 사용자가 Windows Chrome에서 직접 확인한다 |
 | 60초 내보내기(1800프레임)는 실시간 이상의 속도가 필요하다 | — | 순차 디코딩(`canvases()` 반복), 인코더 역압력(`await add()`), Web Worker와 OffscreenCanvas 사용. 느린 경로(탐색 기반 `getCanvas`)는 쓰지 않는다 |
 
 ## 3. 폴더 구조
@@ -45,7 +45,7 @@ TypeScript 7과 Vite 8은 메이저 버전이 새로 올라간 상태다. 태스
 web-editor/
   index.html
   vite.config.ts            # base: './' (어느 경로에 배포해도 동작)
-  playwright.config.ts      # projects: chromium, chrome
+  playwright.config.ts      # project: chrome (channel: 'chrome')
   public/fonts/             # Pretendard, NotoSansKR woff2 (앱에 포함)
   src/
     i18n/ko.ts              # 모든 UI 문자열
@@ -66,10 +66,10 @@ web-editor/
     shortcuts.ts
   tests/
     fixtures/               # 작은 테스트 파일 (커밋)
-    scripts/make-fixtures.mjs  # 성능 테스트용 큰 파일 생성 (테스트 전용 devDependency ffmpeg-static)
+    scripts/make-fixtures.mjs  # 테스트 파일 생성 스크립트 (FFMPEG_PATH 또는 PATH의 ffmpeg 사용)
     e2e/*.spec.ts
 ```
-ffmpeg-static은 **테스트용 파일을 만들 때만** 쓰는 devDependency다. 앱 번들에는 들어가지 않는다.
+ffmpeg는 **개발자가 테스트 파일을 다시 만들 때만** 쓴다. 만든 파일은 커밋하므로 테스트 실행과 앱에는 ffmpeg가 필요 없고, 의존성에도 넣지 않는다.
 
 ## 4. 데이터 모델
 시간은 모두 **정수 프레임**(30fps)으로 저장한다. 실수 오차가 없고 분할/스냅이 프레임에 정확히 맞는다. 화면 표시와 디코딩할 때만 초로 바꾼다.
@@ -187,24 +187,24 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
 
 영상 비트레이트: 1080×1920 30fps는 10Mbps, 오디오는 AAC 192kbps.
 
-### ffmpeg.wasm 대체 경로
+### ffmpeg.wasm 대체 경로 *(2단계로 이동 — 1단계에서는 R1.3 안내 화면만)*
 단일 스레드 코어(`@ffmpeg/core`)를 쓴다. 멀티스레드 코어는 COOP/COEP 헤더가 필요한데 정적 호스팅에서는 보장할 수 없기 때문이다. 코어 파일은 CDN이 아니라 `dist/`에 포함한다. 프레임을 JPEG로 그려 가상 파일 시스템에 쓰고, WAV로 렌더링한 오디오와 함께 `libx264` + `aac`로 인코딩한다. "이 브라우저는 하드웨어 인코딩을 지원하지 않아 느립니다"라고 안내하고 진행률과 취소를 똑같이 제공한다.
 
-## 10. 프록시
+## 10. 프록시 *(보류 — 사용자 확인 1에서 실제 촬영본의 미리보기가 끊길 때만 진행)*
 긴 변이 1080px을 넘는 영상을 가져오면 프록시 생성을 제안한다. Mediabunny `Conversion`으로 긴 변 960px, H.264 2Mbps로 변환해 `derived`에 저장한다. 해상도 옵션은 구현 전에 문서로 확인한다. 프록시 사용 여부는 미디어별로 켜고 끌 수 있다. 내보내기는 항상 원본을 쓴다.
 
 ## 11. 테스트 전략
 - **Vitest**(단위, 빠름): `model/ops.ts`, `snap.ts`, `time.ts`, `gainAt`. 분할/트림/겹침의 경계 조건을 검사한다.
 - **Playwright**:
-  - `chromium` 프로젝트(기본, 수용 기준 A4): VP9/Opus MP4 테스트 파일
-  - `chrome` 프로젝트: H.264/AAC 테스트 파일로 실제 사용자 경로를 검증한다
+  - `chrome` 프로젝트 하나(`channel: 'chrome'`): H.264/AAC 테스트 파일로 실제 사용자 경로를 검증한다
   - 테스트 대상은 `vite build` 후 `vite preview`(localhost)로 띄운 **정적 빌드**다. 개발 서버로 테스트하지 않는다.
   - 기본 시나리오(A4): `setInputFiles`로 가져오기 → 타임라인에 끌어 넣기 → 플레이헤드 이동 → S → 텍스트 추가 → 내보내기 → 다운로드 파일을 페이지 안에서 Mediabunny로 다시 읽어 코덱, 해상도, 길이를 검사한다.
   - 복원(A3): 편집 → `page.reload()` → 스토어 JSON 비교
   - 성능(A1): 1080p 12초 클립 5개(테스트 전에 생성) → `PerformanceObserver('longtask')`로 드래그/트림 중 50ms 초과 작업 수, 재생 중 rAF 간격으로 프레임 드롭 비율을 잰다
   - 한글 글꼴: 텍스트 클립을 넣은 미리보기 캔버스를 캡처하고, 글꼴을 쓰지 않았을 때(□)와 픽셀이 다른지 비교한다
-- **CI**(GitHub Actions): `ubuntu-latest`(chromium + chrome)와 `windows-latest`(chrome) 매트릭스. 결과물은 테스트 리포트와 내보낸 샘플 MP4 아티팩트뿐이다.
+- **CI**(GitHub Actions): `ubuntu-latest` + Playwright `chrome` 채널만 쓴다(Windows 매트릭스 없음). 결과물은 테스트 리포트와 내보낸 샘플 MP4 아티팩트뿐이다.
 
 ## 12. 배포
 - `vite.config.ts`에서 `base: './'`로 설정해 어느 경로에 올려도 동작하게 한다. 서버 코드는 없다.
-- README에 적을 실행 방법: ① Vercel/Netlify에 `dist/` 배포(https) ② 로컬에서 `npx serve dist` 실행 후 Chrome으로 `http://localhost:3000` 열기. file://로 열면 WebCodecs가 동작하지 않으므로 앱이 안내 화면을 보여 준다(R1.3).
+- **GitHub Pages(기본):** `.github/workflows/web-editor-pages.yml`이 작업 브랜치에 push될 때 `web-editor/`를 빌드하고 Playwright 테스트를 통과하면 `actions/upload-pages-artifact@v5` + `actions/deploy-pages@v5`로 배포한다. 주소는 `https://wegyg.github.io/video-ai-studio-up/`이다. Pages는 https라 WebCodecs가 동작한다.
+- README에 적을 다른 실행 방법: 로컬에서 `npx serve dist` 실행 후 Chrome으로 `http://localhost:3000` 열기. file://로 열면 WebCodecs가 동작하지 않으므로 앱이 안내 화면을 보여 준다(R1.3).
