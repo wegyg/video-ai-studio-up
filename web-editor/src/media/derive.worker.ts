@@ -4,6 +4,7 @@
  * (Worker에는 Web Audio의 AudioBuffer가 없으므로 오디오는 AudioSampleSink로 읽는다)
  */
 import { ALL_FORMATS, AudioSampleSink, BlobSource, CanvasSink, Input } from 'mediabunny';
+import { matchPreviewColor } from './color';
 import { PEAKS_PER_SEC, THUMB_H, type DeriveMessage, type DeriveRequest } from './derive-protocol';
 
 const port = self as unknown as {
@@ -41,6 +42,7 @@ async function deriveAv(req: DeriveRequest) {
     const vt = req.kind === 'video' ? await input.getPrimaryVideoTrack() : null;
 
     if (vt && (req.poster || req.filmstrip)) {
+      await matchPreviewColor(vt); // 썸네일도 미리보기와 같은 색으로
       const dw = await vt.getDisplayWidth();
       const dh = await vt.getDisplayHeight();
       if (req.poster) {

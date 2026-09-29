@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ko } from '../i18n/ko';
 import { type LeftTab, useUI } from '../store/ui';
 import { IconFilm, IconMusic, IconSparkles, IconType } from './icons';
+import { EffectsPanel } from './EffectsPanel';
 import { MediaPanel } from './MediaPanel';
 import { TextPanel } from './TextPanel';
 
@@ -12,10 +13,6 @@ const TABS: { id: LeftTab; label: string; icon: ReactNode }[] = [
   { id: 'effects', label: ko.tabs.effects, icon: <IconSparkles /> },
 ];
 
-function Note({ children }: { children: ReactNode }) {
-  return <p className="px-1 py-6 text-center text-sm leading-relaxed text-neutral-400">{children}</p>;
-}
-
 function TabContent({ tab }: { tab: LeftTab }) {
   switch (tab) {
     case 'media':
@@ -25,7 +22,7 @@ function TabContent({ tab }: { tab: LeftTab }) {
     case 'audio':
       return <MediaPanel audioOnly />;
     case 'effects':
-      return <Note>{ko.effects.phase2}</Note>;
+      return <EffectsPanel />;
   }
 }
 

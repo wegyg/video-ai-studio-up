@@ -182,6 +182,21 @@ test('잘못된 JSON을 열면 한국어로 이유를 알려 준다', async ({ p
   }
 });
 
+test('가져온 직후 곧바로 새로고침해도 원본을 잃지 않는다 (저장 경합)', async ({ page }) => {
+  await setup(page, []);
+  // 가져오기가 끝나자마자(목록에 "준비됨"이 뜨자마자, 자동 저장 0.4초를 기다리지 않고) 새로고침한다.
+  // 예전에는 여기서 정리 작업이 "어느 프로젝트에도 없는 원본"으로 보고 방금 넣은 파일을 지웠다.
+  await page.getByTestId('import-input').setInputFiles([fixture('image.png'), fixture('audio.wav')]);
+  await expect(page.locator('[data-testid=media-item][data-status=ready]')).toHaveCount(2);
+  await page.reload();
+  await ready(page);
+  await page.waitForTimeout(500);
+  const stored = await page.evaluate(() => window.__editor.stored());
+  expect(stored.media.map((m) => m.name).sort()).toEqual(['audio.wav', 'image.png']);
+  // 프로젝트 목록에도 남아 있다 (가져오기가 프로젝트를 곧바로 저장한다)
+  expect(Object.values((await state(page)).assets).map((a) => a.name).sort()).toEqual(['audio.wav', 'image.png']);
+});
+
 test('안 쓰는 미디어는 정리되고, 쓰는 미디어는 남는다', async ({ page }) => {
   await setup(page, ['image.png', 'image.jpg']);
   await addViaPlus(page, 'image.png'); // png만 타임라인에 쓴다
@@ -189,12 +204,18 @@ test('안 쓰는 미디어는 정리되고, 쓰는 미디어는 남는다', asyn
   const storedBefore = await page.evaluate(() => window.__editor.stored());
   expect(storedBefore.media).toHaveLength(2); // 아직 둘 다 프로젝트 목록에 있다
 
-  // 미디어 패널에서 jpg를 지우고 저장한 뒤 새로고침하면 저장소에서도 정리된다
+  // 미디어 패널에서 jpg를 지우고 저장한 뒤 새로고침해도, 방금 넣은 원본은 하루 동안 남긴다 (실수로 잃지 않게)
   await page.locator('[data-testid=media-item][title="image.jpg"]').getByTestId('remove-asset').click();
   expect(Object.keys((await state(page)).assets)).toHaveLength(1);
   await save(page);
   await page.reload();
   await ready(page);
+  await page.waitForTimeout(500); // 시작할 때 도는 정리가 끝나기를 기다린다
+  expect((await page.evaluate(() => window.__editor.stored())).media.map((m) => m.name).sort()).toEqual(['image.jpg', 'image.png']);
+
+  // 하루가 지난 뒤 정리하면 쓰지 않는 jpg만 지워진다
+  const r = await page.evaluate(() => window.__editor.cleanupStorage(2));
+  expect(r.media).toBe(1);
   await expect
     .poll(async () => (await page.evaluate(() => window.__editor.stored())).media.map((m) => m.name).sort(), { timeout: 5000 })
     .toEqual(['image.png']);

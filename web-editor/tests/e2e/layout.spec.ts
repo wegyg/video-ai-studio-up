@@ -53,7 +53,9 @@ test('레이아웃: 좌측 탭 4개, 미리보기, 속성, 타임라인(텍스�
 
   await page.getByRole('tab', { name: '효과' }).click();
   await expect(page.getByRole('tab', { name: '효과' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('tabpanel')).toContainText('2단계에서 제공 예정');
+  // 2단계 2-1부터 효과 탭에 캔버스 배경과 필터가 있다. 클립을 고르지 않았으면 무엇을 해야 하는지 안내한다 (G1)
+  await expect(page.getByTestId('effects-panel')).toContainText('캔버스 배경');
+  await expect(page.getByTestId('filter-hint')).toContainText('클립을 먼저 고르세요');
 });
 
 test('비율 전환: 9:16 → 16:9 → 1:1', async ({ page }) => {

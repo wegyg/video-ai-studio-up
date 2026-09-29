@@ -50,9 +50,36 @@ export interface ClipBase {
   duration: number;
 }
 
+/**
+ * 색 조정 값 (R15). 0이면 원본 그대로.
+ * brightness·contrast·saturation·temperature: -100~100, sharpness·vignette: 0~100
+ */
+export interface ColorAdjust {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  temperature: number;
+  sharpness: number;
+  vignette: number;
+}
+
+/** 클립 필터: 고른 프리셋(없으면 null)과 실제 조정 값. 프리셋은 조정 값 모음일 뿐이라 고른 뒤에도 바꿀 수 있다 */
+export interface ClipFilter {
+  preset: string | null;
+  adjust: ColorAdjust;
+}
+
+/**
+ * 캔버스 배경 (R18). 클립이 캔버스를 다 덮지 못할 때 빈 곳을 무엇으로 채울지.
+ * blur: 맨 아래 영상을 캔버스에 꽉 차게 키워 흐리게 깐다 (16:9 영상을 9:16에 넣을 때 위아래)
+ */
+export type CanvasBackground = { kind: 'color'; color: string } | { kind: 'blur'; amount: number };
+
 export interface MediaClip extends ClipBase {
   type: 'video' | 'image' | 'audio';
   assetId: string;
+  /** 필터·조정 (영상·이미지만). 없으면 원본 그대로 — 예전에 저장한 프로젝트에는 이 값이 없다 */
+  filter?: ClipFilter;
   /** 원본에서의 시작 프레임 (이미지는 항상 0) */
   inPoint: number;
   /** 1 = 100% (0~2) */
@@ -149,4 +176,6 @@ export interface Track {
 export interface EditState {
   ratio: Ratio;
   tracks: Track[];
+  /** 캔버스 배경. 없으면 검정 — 예전에 저장한 프로젝트에는 이 값이 없다 */
+  background?: CanvasBackground;
 }

@@ -216,13 +216,22 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
 
 # 2단계·3단계 설계 메모 (확인 1 뒤 추가)
 
-## 13. WebGL 합성으로 전환 (태스크 11)
-효과를 셰이더로 구현해야 하므로 합성을 WebGL2로 바꾼다. 전환은 **1단계가 끝난 뒤**에 한다. 이유는 두 가지다. 태스크 6~10은 Canvas 2D로 충분하고, 태스크 10에서 만드는 "미리보기 = 내보내기 픽셀 비교" 테스트가 전환의 안전장치가 되기 때문이다.
+## 13. 효과 합성 — Canvas 2D + WebGL2 셰이더 (2단계 결정)
+처음 계획(합성 전체를 WebGL2로 바꾸기)은 쓰지 않는다. 1단계에서 검증한 배치·텍스트·오디오 경로와 약 70개 E2E를 다시 만들 위험이 크고, WebGL이 없는 환경에서 편집 자체가 멈추기 때문이다.
 
-- `drawFrame(ctx, edit, frame, sources)`의 역할(미리보기·내보내기 공용 단일 합성 경로)은 그대로 두고 내부만 WebGL2 `Compositor`로 바꾼다. 미리보기는 `<canvas>`, 내보내기는 `OffscreenCanvas`를 쓴다.
-- 파이프라인: 클립 텍스처(`texImage2D`로 `<video>`/`ImageBitmap` 업로드) → 필터 체인(프레임버퍼 왕복) → 트랜지션 합성 → 출력.
-- 텍스트는 2D 캔버스에 그린 뒤 텍스처로 올린다(글꼴 렌더링은 브라우저에 맡긴다).
-- WebGL2를 만들 수 없으면 Canvas 2D 경로로 되돌아가고 효과 UI를 끈다(R13).
+- **배치·텍스트는 그대로** `drawFrame`(Canvas 2D, 미리보기·내보내기 공용)이 그린다.
+- **필터·흐림 배경(그리고 이후 트랜지션·효과)만** `engine/gl/effects.ts`의 WebGL2 셰이더가 처리하고, 결과 캔버스를 `drawImage`로 다시 얹는다. 미리보기는 공용 인스턴스(`sharedEffects`), 내보내기 Worker는 자기 인스턴스(`createEffects`, OffscreenCanvas)를 쓰지만 **셰이더 코드는 같다**(R0.3, R11.8).
+- 필터 식은 두 곳에 있다: 셰이더 `FS_FILTER`와 `model/filters.ts`의 `adjustPixel`(설계식). `filters.spec`이 12종 모두 두 값을 비교하므로 한쪽만 고치면 테스트가 깨진다.
+- 흐림 채우기: 프로젝트 해상도의 1/8로 cover 크롭 → 가로·세로 분리 가우시안(σ = 정도/100 × 10, 반경 ≤ 32). 맨 아래 영상이 회전 없이 화면을 불투명하게 다 덮으면 계산을 건너뛴다.
+- 미리보기 해상도가 작을 때 필터의 픽셀 단위 값(선명도·흐림)은 `effectScale`로 맞춘다(내보내기 1, 미리보기 = 캔버스/프로젝트 비율).
+- WebGL2를 만들 수 없으면 효과만 빼고 그리며 효과 탭에 한국어 안내를 띄운다(R13).
+
+### 원본 색 해석 맞추기 (`media/color.ts`)
+미리보기는 `<video>`가, 내보내기는 WebCodecs(Mediabunny)가 원본을 푼다. 원본에 색 정보(primaries·transfer·matrix)가 셋 다 있지 않으면:
+- Chrome `<video>`: 모두 버리고 세로(natural) 720 미만은 BT.601, 이상은 BT.709로 가정 (Chromium `media/ffmpeg/ffmpeg_common.cc`, VP9·AV1 제외)
+- Mediabunny 1.60: 빈 칸만 BT.709로 채움 (`media-sink.js` VideoDecoderWrapper)
+
+그래서 색 정보 없는 SD 영상은 내보내면 색이 평균 8/255 달라졌다. 내보내기·썸네일 Worker는 트랙의 `getDecoderConfig()`가 Chrome과 같은 색 공간을 돌려주게 바꾼 뒤 CanvasSink를 만든다. 두 길이 같은 디코더 설정을 쓰므로 디코더 종류(Windows 하드웨어 포함)와 상관없이 같은 색이 된다. 검증: `color.spec`(크기·태그 20가지를 ffmpeg BT.601/BT.709 강제 디코딩과 대조해 규칙을 확인했고, 저장소에는 대표 4개를 둔다).
 
 ## 14. 3단계 AI (로컬 실행)
 확인한 사실은 tasks.md 3단계 머리말에 적었다. 설계 요점만 둔다.

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ko } from '../i18n/ko';
 import { toast } from '../ui/toasts';
-import { cleanupStorage, loadLast, restore, startAutosave, storageLow } from './persist';
+import { cleanupStorage, loadLast, recoverOrphanMedia, restore, startAutosave, storageLow } from './persist';
 import { useRelink } from './relink';
 
 export type BootState = 'restoring' | 'ready';
@@ -24,6 +24,13 @@ export function useBoot(): BootState {
         }
       } catch (e) {
         console.warn('[boot] 복원 실패', e);
+      }
+      if (cancelled) return;
+      // 저장이 끝나기 전에 새로고침해서 목록에서만 빠진 최근 미디어를 다시 붙인다
+      try {
+        await recoverOrphanMedia();
+      } catch (e) {
+        console.warn('[boot] 미디어 되살리기 실패', e);
       }
       if (cancelled) return;
       setState('ready');

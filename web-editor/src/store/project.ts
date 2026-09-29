@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { ko } from '../i18n/ko';
 import * as ops from '../model/ops';
-import type { AssetMeta, Clip, EditState, Ratio, TrackKind } from '../model/types';
+import type { AssetMeta, CanvasBackground, Clip, EditState, Ratio, TrackKind } from '../model/types';
 
 export interface ProjectSnapshot {
   id: string;
@@ -35,6 +35,8 @@ export interface ProjectState extends ProjectSnapshot {
   updateClip: (clipId: string, fn: (c: Clip) => Clip) => void;
   addTrack: (kind: TrackKind) => void;
   setTrackMuted: (trackId: string, muted: boolean) => void;
+  /** 캔버스 배경 (단색 / 흐림 채우기) */
+  setBackground: (bg: CanvasBackground) => void;
   /** 저장된 프로젝트로 통째로 바꾼다 (실행 취소 기록은 비운다) */
   replaceProject: (p: ProjectSnapshot) => void;
 }
@@ -93,6 +95,7 @@ export const useProject = create<ProjectState>()(
             return ops.addTrack(e, kind, name);
           }),
         setTrackMuted: (trackId, muted) => apply((e) => ops.setTrackMuted(e, trackId, muted)),
+        setBackground: (bg) => apply((e) => (JSON.stringify(e.background) === JSON.stringify(bg) ? e : { ...e, background: bg })),
         replaceProject: (p) => {
           set({ id: p.id, name: p.name, assets: p.assets, edit: p.edit });
           useProject.temporal.getState().clear();

@@ -2,7 +2,7 @@
 import type { EditorDebugApi } from './debug-types';
 import { previewRef } from './engine/preview/PreviewEngine';
 import { lastExportBuffer } from './engine/export';
-import { saveNow, savedTimes } from './storage/persist';
+import { cleanupStorage, saveNow, savedTimes } from './storage/persist';
 import { toProjectFile } from './storage/project-json';
 import { useMedia } from './media/store';
 import { db, listMediaSizes } from './storage/db';
@@ -63,6 +63,7 @@ export const debugApi: EditorDebugApi = {
   setPreviewResolution: (w, h) => previewRef.current?.resize(w, h, 1),
   saveNow: () => saveNow(),
   savedTimes: () => savedTimes(),
+  cleanupStorage: (daysLater = 0) => cleanupStorage({ now: Date.now() + daysLater * 24 * 60 * 60 * 1000 }),
   projectFile: () => toProjectFile(),
   removeAsset: (id: string) => useProject.getState().removeAsset(id),
   clipBox: (clipId) => {
@@ -84,6 +85,7 @@ export const debugApi: EditorDebugApi = {
       return [d[0], d[1], d[2]];
     });
   },
+  decodePaths: async (blob, frame, raw) => (await import('./dev/decode-paths')).decodePaths(blob, frame, { raw }),
   verifyLastExport: async (times, points) => {
     const buffer = lastExportBuffer();
     if (!buffer) throw new Error('내보낸 파일이 없습니다');

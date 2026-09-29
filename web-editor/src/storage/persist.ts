@@ -9,7 +9,8 @@ import { loadStoredAsset } from '../media/derive';
 import type { AssetMeta } from '../model/types';
 import { useProject, type ProjectSnapshot } from '../store/project';
 import { useUI } from '../store/ui';
-import { allProjects, getMeta, getProject, isQuotaError, putMeta, putProject, storageEstimate, deleteUnreferenced } from './db';
+import { allProjects, getMeta, getProject, isQuotaError, MEDIA_GRACE_MS, putMeta, putProject, recentOrphans, storageEstimate, deleteUnreferenced } from './db';
+import { probeFile } from '../media/probe';
 import { loadWorkTime, markActive, workElapsedMs } from './work-timer';
 
 export const SAVE_DEBOUNCE_MS = 400;
@@ -111,6 +112,44 @@ export async function loadLast(): Promise<SavedProject | null> {
 }
 
 /**
+ * 저장이 끝나기 전에 새로고침한 경우 되살리기: 원본은 저장소에 있는데 어느 프로젝트에도 없는 최근 미디어를
+ * 지금 프로젝트 목록에 다시 붙인다(타임라인에는 넣지 않는다). 사용자가 가져온 파일이 목록에서 사라지지 않게.
+ */
+export async function recoverOrphanMedia(): Promise<number> {
+  const projects = await allProjects<SavedProject>();
+  const referenced = new Set<string>(Object.keys(useProject.getState().assets));
+  for (const p of projects) for (const id of Object.keys(p.project?.assets ?? {})) referenced.add(id);
+  const orphans = await recentOrphans(referenced, MEDIA_GRACE_MS);
+  let recovered = 0;
+  for (const { id, blob } of orphans) {
+    const file = blob instanceof File ? blob : new File([blob], id, { type: blob.type });
+    try {
+      const probed = await probeFile(file);
+      const asset: AssetMeta = {
+        id,
+        kind: probed.kind,
+        name: file.name,
+        size: file.size,
+        mime: file.type,
+        lastModified: file.lastModified,
+        durationFrames: probed.durationFrames,
+        width: probed.width,
+        height: probed.height,
+        hasAudio: probed.hasAudio,
+        hasProxy: false,
+      };
+      useProject.getState().addAsset(asset);
+      await loadStoredAsset(asset);
+      recovered++;
+    } catch {
+      /* 읽을 수 없는 조각은 그냥 둔다 (하루 뒤 정리된다) */
+    }
+  }
+  if (recovered) await saveNow().catch(() => undefined);
+  return recovered;
+}
+
+/**
  * 저장된 프로젝트를 화면에 되살린다.
  * 미디어 원본이 IndexedDB에 없으면 missing으로 돌려주고, 화면에서 다시 연결하게 한다(R10.4).
  */
@@ -130,12 +169,16 @@ export async function restore(saved: SavedProject): Promise<{ missing: AssetMeta
   return { missing };
 }
 
-/** 저장된 어떤 프로젝트도 쓰지 않는 원본·파생 데이터를 지운다 */
-export async function cleanupStorage(): Promise<{ media: number; derived: number }> {
+/**
+ * 저장된 어떤 프로젝트도 쓰지 않는 원본·파생 데이터를 지운다.
+ * 지금 열려 있는 프로젝트의 미디어와 최근에 넣은 원본은 지우지 않는다 (db.ts의 deleteUnreferenced 참고).
+ */
+export async function cleanupStorage(opts: { now?: number } = {}): Promise<{ media: number; derived: number; kept: number }> {
   const projects = await allProjects<SavedProject>();
   const referenced = new Set<string>();
   for (const p of projects) for (const id of Object.keys(p.project?.assets ?? {})) referenced.add(id);
-  return deleteUnreferenced(referenced);
+  const protect = new Set(Object.keys(useProject.getState().assets));
+  return deleteUnreferenced(referenced, { protect, now: opts.now });
 }
 
 /** 남은 공간이 적은지 (10% 미만 또는 50MB 미만) */

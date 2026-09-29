@@ -3,7 +3,8 @@
  */
 import { ko } from './i18n/ko';
 import { clipEnd, createMediaClip, createTextClip, defaultTrackFor, findClip, trackKindFor } from './model/ops';
-import type { Clip, EditState, Ratio, TextStyle } from './model/types';
+import { NEUTRAL_ADJUST, presetFilter } from './model/filters';
+import type { Clip, ColorAdjust, EditState, Ratio, TextStyle } from './model/types';
 import { history } from './store/history';
 import { useProject } from './store/project';
 import { useUI } from './store/ui';
@@ -69,6 +70,32 @@ export const actions = {
   },
   setRatio(ratio: Ratio): void {
     useProject.getState().setRatio(ratio);
+  },
+  /**
+   * 선택한 영상·이미지 클립에 필터를 적용한다 (R15). presetId가 null이면 원본으로.
+   * 결과가 보이도록 플레이헤드를 클립 안으로 옮긴다 (G1).
+   */
+  applyFilterPreset(presetId: string | null): boolean {
+    const id = useUI.getState().selectedClipId;
+    const loc = id ? findClip(useProject.getState().edit, id) : null;
+    if (!loc || (loc.clip.type !== 'video' && loc.clip.type !== 'image')) return false;
+    const filter = presetId ? presetFilter(presetId) : { preset: null, adjust: { ...NEUTRAL_ADJUST } };
+    if (!filter) return false;
+    useProject.getState().updateClip(loc.clip.id, (c) => ({ ...c, filter }) as Clip);
+    actions.revealClip(loc.clip.id);
+    return true;
+  },
+  /** 조정 슬라이더 하나 (프리셋을 고른 뒤에도 바꿀 수 있다) */
+  setAdjust(key: keyof ColorAdjust, value: number): void {
+    const id = useUI.getState().selectedClipId;
+    const loc = id ? findClip(useProject.getState().edit, id) : null;
+    if (!loc || (loc.clip.type !== 'video' && loc.clip.type !== 'image')) return;
+    useProject.getState().updateClip(loc.clip.id, (c) => {
+      if (c.type === 'text') return c;
+      const prev = c.filter ?? { preset: null, adjust: { ...NEUTRAL_ADJUST } };
+      return { ...c, filter: { ...prev, adjust: { ...prev.adjust, [key]: value } } };
+    });
+    actions.revealClip(loc.clip.id);
   },
   /** 텍스트 클립 추가 (R7.1). 첫 텍스트 트랙의 플레이헤드 위치에 넣고 선택한다 */
   addTextClip(style?: TextStyle): string | null {

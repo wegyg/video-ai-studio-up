@@ -7,6 +7,7 @@ import { ACCEPT, ACCEPT_AUDIO } from '../media/probe';
 import { useMedia } from '../media/store';
 import { formatTimecode } from '../model/time';
 import type { AssetMeta } from '../model/types';
+import { markMediaRemoved } from '../storage/db';
 import { useProject } from '../store/project';
 import { IconFilm, IconImage, IconMusic, IconPlus, IconUpload } from './icons';
 import { assetDrag } from './timeline/view';
@@ -60,7 +61,10 @@ function MediaTile({ asset }: { asset: AssetMeta }) {
           data-testid="remove-asset"
           aria-label={ko.media.remove(asset.name)}
           title={ko.media.remove(asset.name)}
-          onClick={() => useProject.getState().removeAsset(asset.id)}
+          onClick={() => {
+            useProject.getState().removeAsset(asset.id);
+            void markMediaRemoved(asset.id); // 새로고침 때 "되살리기" 대상에서 빼 달라는 표시
+          }}
           className="absolute top-1 left-1 flex size-6 items-center justify-center rounded-full bg-neutral-900/80 text-neutral-200 opacity-0 hover:bg-red-600 group-hover:opacity-100 focus:opacity-100"
         >
           ✕

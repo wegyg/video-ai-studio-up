@@ -7,6 +7,7 @@ import { ko } from '../i18n/ko';
 import { newId } from '../model/ops';
 import type { AssetMeta } from '../model/types';
 import { isQuotaError, putMedia } from '../storage/db';
+import { saveNow } from '../storage/persist';
 import { useProject } from '../store/project';
 import { toast } from '../ui/toasts';
 import { registerNewAsset } from './derive';
@@ -52,6 +53,9 @@ export async function importFiles(files: File[]): Promise<ImportOutcome> {
     }
   }
   await Promise.all(saves);
+  // 원본을 저장했으면 그 원본을 가리키는 프로젝트도 곧바로 저장한다.
+  // (자동 저장은 0.4초 뒤라, 그 사이에 새로고침하면 "어느 프로젝트에도 없는 원본"이 생긴다)
+  if (out.added.length) await saveNow().catch(() => undefined);
   return out;
 }
 

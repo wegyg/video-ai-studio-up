@@ -17,6 +17,8 @@ import { FPS, RATIO_SIZE, type Clip, type EditState, type MediaClip } from '../.
 import { useProject } from '../../store/project';
 import { useUI } from '../../store/ui';
 import { clipAt, drawFrame, type FrameSources } from '../compose';
+import { sharedEffects } from '../gl/effects';
+import { needsEffects } from '../../model/filters';
 import { clipBox, containsPoint, textBox, type Box, type Point } from '../geometry';
 import { drawTextClip, layoutText } from '../text';
 import { ensureFont, isFontLoaded, type FontFamily, type FontWeight } from '../../fonts';
@@ -455,7 +457,11 @@ export class PreviewEngine {
     this.ctx.setTransform(k, 0, 0, k, 0, 0);
     let ready = true;
     const f = Math.floor(frame);
+    // 효과(필터·흐림 배경)가 있을 때만 WebGL 처리기를 쓴다. 내보내기 Worker도 같은 처리기를 만든다.
+    const effects = needsEffects(edit) ? sharedEffects() : null;
     const sources: FrameSources = {
+      effects,
+      effectScale: k,
       text: (c, clip) => {
         // 글꼴이 아직 안 올라왔으면 그리지 않고, 올라오면 다시 그린다 (다른 글꼴로 잘못 보이지 않게)
         if (!this.ensureTextFont(clip.font, clip.weight)) {

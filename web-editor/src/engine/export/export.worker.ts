@@ -24,6 +24,9 @@ import {
   type WrappedCanvas,
 } from 'mediabunny';
 import { baseSize, clipAt, drawFrame, type FrameSources, type VisualSource } from '../compose';
+import { createEffects } from '../gl/effects';
+import { matchPreviewColor } from '../../media/color';
+import { needsEffects } from '../../model/filters';
 import { drawTextClip } from '../text';
 import type { Clip, EditState, MediaClip } from '../../model/types';
 import type { ExportMessage, ExportRequest } from './protocol';
@@ -119,7 +122,11 @@ async function run(req: ExportRequest): Promise<void> {
       const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
       inputs.push(input);
       const track = await input.getPrimaryVideoTrack();
-      if (track) videos.set(assetId, { track, width: await track.getDisplayWidth(), height: await track.getDisplayHeight() });
+      if (track) {
+        // 색 정보 없는 영상도 미리보기(<video>)와 같은 색으로 풀리게 (media/color.ts)
+        await matchPreviewColor(track);
+        videos.set(assetId, { track, width: await track.getDisplayWidth(), height: await track.getDisplayHeight() });
+      }
     }
   }
 
@@ -214,9 +221,13 @@ async function run(req: ExportRequest): Promise<void> {
       }
     };
 
+    // 효과가 있으면 미리보기와 같은 WebGL 처리기를 이 Worker 안에 만든다 (같은 셰이더 코드)
+    const effects = needsEffects(edit) ? createEffects() : null;
     const sources: FrameSources = {
       visual: (clip) => pending.get(clip.id) ?? null,
       text: (c, clip, frame) => drawTextClip(c, clip, W, H, frame),
+      effects,
+      effectScale: 1,
     };
 
     // 소리는 1초 분량씩 넣는다 (영상과 번갈아 → 메모리에 쌓이지 않게)

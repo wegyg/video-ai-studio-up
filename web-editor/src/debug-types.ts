@@ -53,8 +53,14 @@ export interface DebugState {
         shadow?: { enabled: boolean; color: string; blur: number; offsetX: number; offsetY: number };
         animIn?: { type: string; duration: number };
         animOut?: { type: string; duration: number };
+        // 필터 (2단계)
+        filter?: {
+          preset: string | null;
+          adjust: { brightness: number; contrast: number; saturation: number; temperature: number; sharpness: number; vignette: number };
+        };
       }[];
     }[];
+    background?: { kind: 'color'; color: string } | { kind: 'blur'; amount: number };
   };
   ui: { selectedClipId: string | null; playhead: number; playing: boolean; pxPerFrame: number; snap: boolean; leftTab: string };
   history: { past: number; future: number };
@@ -105,12 +111,31 @@ export interface EditorDebugApi {
   saveNow: () => Promise<void>;
   /** 저장이 몇 번 일어났는지 */
   savedTimes: () => number;
+  /** 안 쓰는 저장 데이터 정리를 지금 돌린다. daysLater로 "며칠 뒤"를 흉내 낸다 */
+  cleanupStorage: (daysLater?: number) => Promise<{ media: number; derived: number; kept: number }>;
   /** 프로젝트 파일(JSON)로 나갈 내용 */
   projectFile: () => unknown;
   /** 미디어를 목록에서 지운다 (그 미디어를 쓰는 클립도 지워진다) */
   removeAsset: (id: string) => void;
   /** 미리보기 캔버스에서 여러 좌표(0~1 비율)의 픽셀을 한 번에 읽는다 */
   previewPixels: (points: [number, number][]) => number[][];
+  /**
+   * 같은 원본 프레임을 미리보기(<video>)와 내보내기(Mediabunny, 같은 색 설정) 길로 풀어 비교한다.
+   * raw면 두 길의 RGB 원시값(W×H×3, base64)도 돌려준다.
+   */
+  decodePaths: (
+    blob: Blob,
+    frame: number,
+    raw?: boolean,
+  ) => Promise<{
+    w: number;
+    h: number;
+    colorSpace: VideoColorSpaceInit;
+    applied: VideoColorSpaceInit | null;
+    meanAbs: number;
+    video?: string;
+    sink?: string;
+  }>;
   /** 마지막으로 내보낸 MP4의 바이트 수 */
   lastExportBytes: () => number;
   /** 브라우저 전용 저장소(OPFS)에 쓴 MP4를 검사한다 — 파일에 바로 쓰는 저장 경로 확인용 */

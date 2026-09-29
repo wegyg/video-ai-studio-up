@@ -50,6 +50,20 @@ run('hevc.mp4', [
   '-c:v', 'libx265', '-pix_fmt', 'yuv420p', '-tag:v', 'hvc1', '-x265-params', 'log-level=error',
 ]);
 
+// 2-2) 색 정보 해석 검사용 (320x180, 0.5초). Chrome은 색 정보가 셋 다 있을 때만 그대로 쓰고,
+//      아니면 세로 해상도로 BT.601/BT.709를 가정한다 (src/media/color.ts).
+//      - color-tag709-sd: SD인데 BT.709로 다 적힘 → 적힌 값(709)을 따라야 한다
+//      - color-matrix-only-sd: matrix만 BT.709 → Chrome은 무시하고 SD 기본값(601)으로 푼다
+run('color-tag709-sd.mp4', [
+  '-f', 'lavfi', '-i', 'testsrc2=s=320x180:r=30:d=0.5',
+  '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20',
+  '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+]);
+run('color-matrix-only-sd.mp4', [
+  '-f', 'lavfi', '-i', 'testsrc2=s=320x180:r=30:d=0.5',
+  '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-x264-params', 'colormatrix=bt709',
+]);
+
 // 3) 이미지: PNG 400x400 청록, JPG 600x400 주황.
 run('image.png', ['-f', 'lavfi', '-i', 'color=c=0x00FFFF:s=400x400', '-frames:v', '1']);
 run('image.jpg', ['-f', 'lavfi', '-i', 'color=c=0xFF8800:s=600x400', '-frames:v', '1', '-q:v', '3']);
