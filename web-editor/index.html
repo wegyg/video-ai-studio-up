@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>웹 영상 편집기</title>
+  </head>
+  <body>
+    <!--
+      file://로 열면 모듈 스크립트가 차단되어 앱이 아예 뜨지 않는다.
+      그래서 인라인(일반) 스크립트로 file:// 여부만 확인해 안내를 보여 준다. (R1.3)
+    -->
+    <div id="file-protocol-notice" hidden style="max-width:640px;margin:15vh auto;padding:24px;font-family:'Malgun Gothic',sans-serif;line-height:1.7;color:#eee;background:#222;border-radius:12px">
+      <h1 style="font-size:20px;margin:0 0 12px">이 파일은 직접 열 수 없습니다</h1>
+      <p style="margin:0 0 8px">영상 편집 기능(WebCodecs)은 https 주소나 localhost에서만 동작합니다.</p>
+      <p style="margin:0">배포된 주소로 접속하거나, 명령 프롬프트에서 <code>npx serve dist</code>를 실행한 뒤 Chrome으로 <code>http://localhost:3000</code>을 여세요.</p>
+    </div>
+    <script>
+      if (location.protocol === 'file:') document.getElementById('file-protocol-notice').hidden = false;
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
