@@ -14,6 +14,7 @@
     "fixtures": "node tests/scripts/make-fixtures.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
     "@mediabunny/aac-encoder": "1.60.0",
     "idb": "8.0.3",
     "mediabunny": "1.60.0",

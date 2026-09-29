@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { ko } from '../i18n/ko';
 import { type LeftTab, useUI } from '../store/ui';
-import { IconFilm, IconMusic, IconShapes, IconSparkles, IconType } from './icons';
+import { IconCaptions, IconFilm, IconMusic, IconShapes, IconSparkles, IconType } from './icons';
+import { CaptionsPanel } from './CaptionsPanel';
 import { ElementsPanel } from './ElementsPanel';
 import { EffectsPanel } from './EffectsPanel';
 import { MediaPanel } from './MediaPanel';
@@ -13,6 +14,7 @@ const TABS: { id: LeftTab; label: string; icon: ReactNode }[] = [
   { id: 'audio', label: ko.tabs.audio, icon: <IconMusic /> },
   { id: 'elements', label: ko.tabs.elements, icon: <IconShapes /> },
   { id: 'effects', label: ko.tabs.effects, icon: <IconSparkles /> },
+  { id: 'captions', label: ko.tabs.captions, icon: <IconCaptions /> },
 ];
 
 function TabContent({ tab }: { tab: LeftTab }) {
@@ -27,6 +29,8 @@ function TabContent({ tab }: { tab: LeftTab }) {
       return <EffectsPanel />;
     case 'elements':
       return <ElementsPanel />;
+    case 'captions':
+      return <CaptionsPanel />;
   }
 }
 

@@ -127,6 +127,13 @@ export const IconLayers = (p: P) => (
     <rect x="8" y="3" width="13" height="13" rx="1.5" />
   </Svg>
 );
+/** 자막: 말풍선 안의 글줄 */
+export const IconCaptions = (p: P) => (
+  <Svg {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M7 11h4M13 11h4M7 15h7" />
+  </Svg>
+);
 export const IconUpload = (p: P) => (
   <Svg {...p}>
     <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />

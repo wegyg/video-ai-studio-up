@@ -265,6 +265,13 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
 그래서 색 정보 없는 SD 영상은 내보내면 색이 평균 8/255 달라졌다. 내보내기·썸네일 Worker는 트랙의 `getDecoderConfig()`가 Chrome과 같은 색 공간을 돌려주게 바꾼 뒤 CanvasSink를 만든다. 두 길이 같은 디코더 설정을 쓰므로 디코더 종류(Windows 하드웨어 포함)와 상관없이 같은 색이 된다. 검증: `color.spec`(크기·태그 20가지를 ffmpeg BT.601/BT.709 강제 디코딩과 대조해 규칙을 확인했고, 저장소에는 대표 4개를 둔다).
 
 ## 14. 3단계 AI (로컬 실행)
+
+### 자동 자막 (3-1)
+- `src/ai/whisper.worker.ts`: transformers.js 파이프라인. 장치는 `navigator.gpu.requestAdapter()`로 실제 확인 후 WebGPU, 실패하면 CPU. 양자화는 장치별 후보를 순서대로 시도한다. 모델 내려받기 진행률은 파일별 바이트를 합쳐 150ms마다 보낸다.
+- `src/ai/captions-job.ts`: ① 내보내기와 같은 믹서로 소리를 모은다(16kHz 모노, 덕킹 없음, 고른 클립만 가능) ② Worker에 보내 단어별 타이밍을 받는다 ③ `model/captions.ts`로 자막 클립 목록을 만든다 ④ `actions.createCaptions`가 겹치지 않는 텍스트 트랙에 한 번에 넣는다(실행 취소 1번).
+- 소리 모으기는 `mixExportAudio(..., { sampleRate, channels, only, ducking })`를 재사용한다 → 내보낸 소리와 인식한 소리가 같은 계산에서 나온다.
+- 단어 시각은 **타임라인 시각**이다(믹스가 클립 위치에 소리를 놓기 때문) → 자막이 말하는 순간에 정확히 붙는다.
+
 확인한 사실은 tasks.md 3단계 머리말에 적었다. 설계 요점만 둔다.
 
 - **실행 위치:** 전용 Worker. 편집을 막지 않고 취소할 수 있다.

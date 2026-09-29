@@ -19,6 +19,17 @@ import type { ExportAudio } from './protocol';
 
 export const EXPORT_SAMPLE_RATE = 48000;
 
+export interface MixOptions {
+  /** 표본율 (기본 48000). 자동 자막은 16000을 쓴다 */
+  sampleRate?: number;
+  /** 채널 수 (기본 2) */
+  channels?: number;
+  /** 이 클립들만 섞는다 (기본 전체) */
+  only?: Set<string>;
+  /** 자동 덕킹 적용 (기본 적용) */
+  ducking?: boolean;
+}
+
 function interleave(buffer: AudioBuffer): Float32Array {
   const ch = buffer.numberOfChannels;
   const out = new Float32Array(buffer.length * ch);
@@ -56,12 +67,13 @@ async function decodeRange(track: InputAudioTrack, from: number, to: number): Pr
 }
 
 /** 소리를 낼 클립 모으기 (음소거 트랙 제외) */
-function collect(edit: EditState, assets: Record<string, AssetMeta>): MediaClip[] {
+function collect(edit: EditState, assets: Record<string, AssetMeta>, only?: Set<string>): MediaClip[] {
   const out: MediaClip[] = [];
   for (const track of edit.tracks) {
     if (track.kind === 'text' || track.muted) continue;
     for (const clip of track.clips) {
       if (!isMedia(clip) || clip.type === 'image') continue;
+      if (only && !only.has(clip.id)) continue;
       if (!assets[clip.assetId]?.hasAudio) continue;
       if (clip.type === 'video' && clip.audioDetached) continue; // 소리를 오디오 트랙으로 분리한 영상
       out.push(clip);
@@ -76,15 +88,18 @@ export async function mixExportAudio(
   assets: Record<string, AssetMeta>,
   blobs: Record<string, Blob>,
   totalFrames: number,
+  opts: MixOptions = {},
 ): Promise<ExportAudio | null> {
-  const clips = collect(edit, assets);
+  const rate = opts.sampleRate ?? EXPORT_SAMPLE_RATE;
+  const channels = opts.channels ?? 2;
+  const clips = collect(edit, assets, opts.only);
   if (!clips.length || totalFrames <= 0) return null;
 
   // 자동 덕킹: 미리보기와 같은 파형 자료·같은 함수로 곡선을 만든다 (model/ducking.ts)
   const entries = useMedia.getState().entries;
-  const env = duckEnvelope(edit, assets, (id) => entries[id]?.peaks, totalFrames);
-  const length = Math.ceil((totalFrames / FPS) * EXPORT_SAMPLE_RATE);
-  const ctx = new OfflineAudioContext(2, length, EXPORT_SAMPLE_RATE);
+  const env = opts.ducking === false ? null : duckEnvelope(edit, assets, (id) => entries[id]?.peaks, totalFrames);
+  const length = Math.ceil((totalFrames / FPS) * rate);
+  const ctx = new OfflineAudioContext(channels, length, rate);
   const inputs = new Map<string, Input>();
   let placed = 0;
   try {

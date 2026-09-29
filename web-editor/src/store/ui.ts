@@ -1,7 +1,7 @@
 /** 화면 상태 (실행 취소 기록 안 함): 선택, 플레이헤드, 재생, 줌, 스냅, 좌측 탭 */
 import { create } from 'zustand';
 
-export type LeftTab = 'media' | 'text' | 'audio' | 'effects' | 'elements';
+export type LeftTab = 'media' | 'text' | 'audio' | 'effects' | 'elements' | 'captions';
 
 /** 줌: 프레임당 픽셀. 0.2 = 초당 6px, 20 = 초당 600px */
 export const ZOOM_MIN = 0.2;

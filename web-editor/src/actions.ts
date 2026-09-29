@@ -7,6 +7,7 @@ import { clipEnd, createMediaClip, createShapeClip, createTextClip, DEFAULT_TRAN
 import { NEUTRAL_ADJUST, presetFilter } from './model/filters';
 import { keyOffsets, setEaseAt, setValues, toggleKeys, TRANSFORM_PROPS } from './model/keyframes';
 import { setEffectIntensity, TIME_VARYING, toggleEffect } from './model/effects';
+import type { CaptionSpec, CaptionStyle } from './model/captions';
 import {
   cutsOf,
   maxTransitionFrames,
@@ -341,6 +342,34 @@ export const actions = {
     ui.setPlayhead(from);
     ui.setPlayRange({ end: Math.min(clipEnd(c), from + 45), returnTo: from });
     ui.setPlaying(true);
+  },
+  /**
+   * 자막 클립 만들기 (R20): 겹치지 않는 텍스트 트랙에 한 번에 넣는다(없으면 새 트랙). 실행 취소 1번.
+   * 만든 자막은 보통 텍스트 클립이라 글자·위치·스타일을 바로 고칠 수 있다.
+   */
+  createCaptions(specs: CaptionSpec[], style: CaptionStyle, textStyle?: TextStyle): number {
+    if (!specs.length) return 0;
+    const fits = (t: Track) =>
+      t.kind === 'text' && specs.every((s) => t.clips.every((c) => s.start >= clipEnd(c) || s.start + s.duration <= c.start));
+    history.beginGesture();
+    let track = useProject.getState().edit.tracks.find(fits);
+    if (!track) {
+      useProject.getState().addTrack('text');
+      track = useProject.getState().edit.tracks.find(fits);
+    }
+    let made = 0;
+    if (track) {
+      for (const s of specs) {
+        const clip = createTextClip(s.start, s.text, textStyle);
+        clip.duration = s.duration;
+        // 단어 강조는 단어가 톡 나타나게 (문장 자막은 애니메이션 없이 바로 보인다)
+        if (style === 'word') clip.animIn = { type: 'pop', duration: Math.min(6, s.duration) };
+        if (useProject.getState().addClip(track.id, clip)) made++;
+      }
+    }
+    history.endGesture();
+    if (made) useUI.getState().select(null);
+    return made;
   },
   /** 화면 배치 초기화: 배치 키프레임도 지운다 */
   resetTransform(clipId: string): void {

@@ -1,4 +1,5 @@
 /** 테스트용 창구: window.__editor. 편집기 내부 상태를 읽기 전용 데이터로 노출한다. */
+import { actions } from './actions';
 import type { EditorDebugApi } from './debug-types';
 import { previewRef } from './engine/preview/PreviewEngine';
 import { lastExportBuffer, setExportSizeOverride } from './engine/export';
@@ -86,6 +87,13 @@ export const debugApi: EditorDebugApi = {
       const d = ctx.getImageData(x, y, 1, 1).data;
       return [d[0], d[1], d[2]];
     });
+  },
+  captionsFromWords: async (words, style) => {
+    const { buildCaptions } = await import('./model/captions');
+    const { TEXT_PRESETS } = await import('./model/text-presets');
+    const { FPS } = await import('./model/types');
+    const specs = buildCaptions(words, { style, fps: FPS });
+    return actions.createCaptions(specs, style, TEXT_PRESETS.find((p) => p.id === 'shorts-caption')?.style);
   },
   decodePaths: async (blob, frame, raw) => (await import('./dev/decode-paths')).decodePaths(blob, frame, { raw }),
   verifyLastExport: async (times, points) => {

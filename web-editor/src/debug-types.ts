@@ -153,6 +153,8 @@ export interface EditorDebugApi {
     video?: string;
     sink?: string;
   }>;
+  /** 검증용: 인식된 단어 목록으로 자막 클립을 만든다 (모델 없이 자막 규칙만 확인) */
+  captionsFromWords: (words: { text: string; start: number; end: number }[], style: 'line' | 'word') => Promise<number>;
   /** 마지막으로 내보낸 MP4의 바이트 수 */
   lastExportBytes: () => number;
   /** 브라우저 전용 저장소(OPFS)에 쓴 MP4를 검사한다 — 파일에 바로 쓰는 저장 경로 확인용 */
