@@ -52,7 +52,19 @@ function MediaTile({ asset }: { asset: AssetMeta }) {
             {formatTimecode(asset.durationFrames).slice(0, 5)}
           </span>
         )}
-        <span className="absolute top-1 left-1 rounded bg-black/60 px-1 text-[10px] text-neutral-300">{ko.media.kind[asset.kind]}</span>
+        <span className="absolute top-1 left-1 rounded bg-black/60 px-1 text-[10px] text-neutral-300 group-hover:opacity-0">
+          {ko.media.kind[asset.kind]}
+        </span>
+        <button
+          type="button"
+          data-testid="remove-asset"
+          aria-label={ko.media.remove(asset.name)}
+          title={ko.media.remove(asset.name)}
+          onClick={() => useProject.getState().removeAsset(asset.id)}
+          className="absolute top-1 left-1 flex size-6 items-center justify-center rounded-full bg-neutral-900/80 text-neutral-200 opacity-0 hover:bg-red-600 group-hover:opacity-100 focus:opacity-100"
+        >
+          ✕
+        </button>
         <button
           type="button"
           data-testid="add-to-timeline"

@@ -1,6 +1,8 @@
 /** 테스트용 창구: window.__editor. 편집기 내부 상태를 읽기 전용 데이터로 노출한다. */
 import type { EditorDebugApi } from './debug-types';
 import { previewRef } from './engine/preview/PreviewEngine';
+import { saveNow, savedTimes } from './storage/persist';
+import { toProjectFile } from './storage/project-json';
 import { useMedia } from './media/store';
 import { db, listMediaSizes } from './storage/db';
 import { useProject } from './store/project';
@@ -57,6 +59,10 @@ export const debugApi: EditorDebugApi = {
   }),
   preview: () => previewRef.current?.stats() ?? null,
   clipGain: (clipId) => previewRef.current?.clipGain(clipId) ?? null,
+  saveNow: () => saveNow(),
+  savedTimes: () => savedTimes(),
+  projectFile: () => toProjectFile(),
+  removeAsset: (id: string) => useProject.getState().removeAsset(id),
   clipBox: (clipId) => {
     const id = clipId ?? useUI.getState().selectedClipId;
     return id ? (previewRef.current?.boxOf(id) ?? null) : null;

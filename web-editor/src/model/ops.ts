@@ -249,6 +249,18 @@ export function splitClip(edit: EditState, clipId: string, at: number): { edit: 
   return { edit: replaceTrack(edit, { ...loc.track, clips }), rightId };
 }
 
+/** 이 미디어를 쓰는 클립을 모두 지운다 (미디어 목록에서 삭제할 때) */
+export function removeAssetClips(edit: EditState, assetId: string): EditState {
+  let changed = false;
+  const tracks = edit.tracks.map((t) => {
+    const clips = t.clips.filter((c) => c.type === 'text' || c.assetId !== assetId);
+    if (clips.length === t.clips.length) return t;
+    changed = true;
+    return { ...t, clips };
+  });
+  return changed ? { ...edit, tracks } : edit;
+}
+
 /** 삭제 (R5.4) */
 export function deleteClip(edit: EditState, clipId: string): EditState {
   const loc = findClip(edit, clipId);

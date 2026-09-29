@@ -99,6 +99,14 @@ export interface EditorDebugApi {
   clipBox: (clipId?: string) => { cx: number; cy: number; w: number; h: number; rotation: number } | null;
   /** 미리보기가 이 클립에 적용 중인 소리 크기 (GainNode 값) */
   clipGain: (clipId: string) => number | null;
+  /** 지금 상태를 바로 저장한다 (자동 저장을 기다리지 않고) */
+  saveNow: () => Promise<void>;
+  /** 저장이 몇 번 일어났는지 */
+  savedTimes: () => number;
+  /** 프로젝트 파일(JSON)로 나갈 내용 */
+  projectFile: () => unknown;
+  /** 미디어를 목록에서 지운다 (그 미디어를 쓰는 클립도 지워진다) */
+  removeAsset: (id: string) => void;
   [key: string]: unknown;
 }
 

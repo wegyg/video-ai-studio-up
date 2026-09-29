@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
+import { ko } from '../i18n/ko';
 import { hasFiles, importFiles } from '../media/import';
 import { installShortcuts } from '../shortcuts';
+import { useBoot } from '../storage/useBoot';
+import { RelinkDialog } from './RelinkDialog';
 import { Inspector } from './Inspector';
 import { LeftPanel } from './LeftPanel';
 import { Preview } from './Preview';
@@ -35,6 +38,14 @@ function useWindowFileDrop() {
 export function Editor() {
   useEffect(() => installShortcuts(), []);
   useWindowFileDrop();
+  const boot = useBoot();
+  if (boot === 'restoring') {
+    return (
+      <main className="flex h-full items-center justify-center" data-testid="restoring">
+        <p className="text-sm text-neutral-400">{ko.storage.restoring}</p>
+      </main>
+    );
+  }
   return (
     // grid-cols-1 = minmax(0,1fr): 열이 타임라인 내용 너비만큼 늘어나 화면 밖으로 밀리지 않게 한다
     <div className="grid h-full grid-cols-1 grid-rows-[auto_minmax(0,1fr)_minmax(240px,40%)]">
@@ -46,6 +57,7 @@ export function Editor() {
       </div>
       <Timeline />
       <Toasts />
+      <RelinkDialog />
     </div>
   );
 }

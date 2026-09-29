@@ -67,3 +67,48 @@ export async function putDerived(key: string, value: DerivedValue): Promise<void
 export async function getDerived<T extends DerivedValue>(key: string): Promise<T | undefined> {
   return (await db()).get('derived', key) as Promise<T | undefined>;
 }
+
+// --- 프로젝트 / 기타 값 -----------------------------------------------------
+
+export async function putProject(id: string, value: unknown): Promise<void> {
+  await (await db()).put('projects', value, id);
+}
+export async function getProject<T>(id: string): Promise<T | undefined> {
+  return (await db()).get('projects', id) as Promise<T | undefined>;
+}
+export async function allProjects<T>(): Promise<T[]> {
+  return (await db()).getAll('projects') as Promise<T[]>;
+}
+export async function putMeta(key: string, value: unknown): Promise<void> {
+  await (await db()).put('meta', value, key);
+}
+export async function getMeta<T>(key: string): Promise<T | undefined> {
+  return (await db()).get('meta', key) as Promise<T | undefined>;
+}
+
+/** 어떤 프로젝트도 쓰지 않는 원본·파생 데이터를 지운다 */
+export async function deleteUnreferenced(referenced: Set<string>): Promise<{ media: number; derived: number }> {
+  const d = await db();
+  let media = 0;
+  let derived = 0;
+  for (const key of await d.getAllKeys('media')) {
+    if (!referenced.has(String(key))) {
+      await d.delete('media', key);
+      media++;
+    }
+  }
+  for (const key of await d.getAllKeys('derived')) {
+    if (!referenced.has(String(key).split(':')[0])) {
+      await d.delete('derived', key);
+      derived++;
+    }
+  }
+  return { media, derived };
+}
+
+/** 남은 저장 공간 (브라우저가 알려 주지 않으면 null) */
+export async function storageEstimate(): Promise<{ usage: number; quota: number } | null> {
+  if (!navigator.storage?.estimate) return null;
+  const e = await navigator.storage.estimate();
+  return { usage: e.usage ?? 0, quota: e.quota ?? 0 };
+}

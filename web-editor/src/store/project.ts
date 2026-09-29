@@ -21,6 +21,8 @@ export interface ProjectState extends ProjectSnapshot {
   setRatio: (ratio: Ratio) => void;
   addAsset: (asset: AssetMeta) => void;
   updateAsset: (id: string, patch: Partial<AssetMeta>) => void;
+  /** 미디어를 목록에서 빼고, 그 미디어를 쓰는 클립도 함께 지운다 */
+  removeAsset: (id: string) => void;
   /** 성공하면 넣은 클립 id */
   addClip: (trackId: string, clip: Clip) => string | null;
   moveClip: (clipId: string, toTrackId: string, toStart: number) => void;
@@ -60,6 +62,14 @@ export const useProject = create<ProjectState>()(
         addAsset: (asset) => set((s) => ({ assets: { ...s.assets, [asset.id]: asset } })),
         updateAsset: (id, patch) =>
           set((s) => (s.assets[id] ? { assets: { ...s.assets, [id]: { ...s.assets[id], ...patch } } } : s)),
+        removeAsset: (id) => {
+          const s = get();
+          if (!s.assets[id]) return;
+          const rest = { ...s.assets };
+          delete rest[id];
+          const edit = ops.removeAssetClips(s.edit, id);
+          set({ assets: rest, ...(edit === s.edit ? {} : { edit }) });
+        },
         addClip: (trackId, clip) => (apply((e) => ops.addClip(e, trackId, clip)) ? clip.id : null),
         moveClip: (clipId, toTrackId, toStart) => apply((e) => ops.moveClip(e, clipId, toTrackId, toStart)),
         setClipStart: (clipId, start) =>
