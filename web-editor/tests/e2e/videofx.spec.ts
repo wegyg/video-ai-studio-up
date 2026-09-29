@@ -3,7 +3,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { meanDiff, previewGrid, previewVsExport } from './compare';
-import { addViaPlus, clipEl, pixel, seekRuler, setup, state, tile, waitRendered } from './helpers';
+import { addViaPlus, clipEl, drag, pixel, seekRuler, setup, state, tile, waitRendered } from './helpers';
 
 const fx = (page: Page, kind: string) => page.locator(`[data-testid=video-fx][data-kind="${kind}"]`);
 const clipById = async (page: Page, id: string) => (await state(page)).edit.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
@@ -136,6 +136,10 @@ test('미리보기 = 내보내기: 영상(레트로·블러) + 로고(흔들림�
   await fx(page, 'retro').click();
   await fx(page, 'blur').click();
   expect((await clipById(page, logo)).effects?.map((e) => e.kind)).toEqual(['shake', 'flash', 'zoom-pulse']);
+  // 내보내기를 2초로 줄인다 (끝 핸들을 끌어 두 클립 모두 0~60) — 몇 프레임만 비교하면 된다
+  await drag(page, clipEl(page, logo).getByTestId('trim-end'), -180);
+  await drag(page, clipEl(page, v).getByTestId('trim-end'), -120);
+  expect([(await clipById(page, logo)).duration, (await clipById(page, v)).duration]).toEqual([60, 60]);
   const frames = [4, 20, 50];
   const diffs = await previewVsExport(page, frames, 'VIDEOFX_EXPORT');
   for (let i = 0; i < frames.length; i++) expect(diffs[i], `프레임 ${frames[i]}`).toBeLessThanOrEqual(3);

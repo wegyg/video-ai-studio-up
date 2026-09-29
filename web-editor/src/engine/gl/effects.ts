@@ -46,16 +46,16 @@ uniform vec3 u_fx2;    // 레트로, 블러 강도, 클립 시작부터의 시�
 out vec4 outColor;
 
 // 블러: 반경은 프로젝트 기준 픽셀(강도 100% = 40px) → 미리보기·내보내기 해상도가 달라도 같은 모습.
-// 7×7 표본 사이 간격만큼 미리 평균 낸 밉맵 단계에서 읽어, 반경이 커도 겹쳐 보이는 자국이 없다
+// 5×5 표본 사이 간격만큼 미리 평균 낸 밉맵 단계에서 읽어, 반경이 커도 겹쳐 보이는 자국이 없다
 vec4 tap(vec2 uv) {
   if (u_fx2.y <= 0.0) return texture(u_tex, uv);
   float rpx = u_sharpPx * u_fx2.y * 40.0;
   vec2 r = u_texel * rpx;
-  float lod = log2(max(rpx / 3.0, 1.0));
+  float lod = log2(max(rpx / 2.0, 1.0));
   vec4 acc = vec4(0.0);
   float ws = 0.0;
-  for (int j = -3; j <= 3; j++) for (int i = -3; i <= 3; i++) {
-    vec2 o = vec2(float(i), float(j)) / 3.0;
+  for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++) {
+    vec2 o = vec2(float(i), float(j)) / 2.0;
     float w = exp(-dot(o, o) * 2.0);
     acc += textureLod(u_tex, uv + o * r, lod) * w;
     ws += w;
@@ -75,11 +75,11 @@ void main() {
 
   vec4 src = tap(uv);
   vec3 c = src.rgb;
-  if (u_fx2.x > 0.0) {
-    // 레트로: 빨강·파랑이 살짝 어긋난다
+  if (u_fx2.x > 0.0 && u_fx2.y <= 0.0) {
+    // 레트로: 빨강·파랑이 살짝 어긋난다 (블러를 함께 켜면 번짐에 묻히므로 생략 — 표본을 세 배로 읽지 않게)
     float d = 0.004 * u_fx2.x;
-    c.r = mix(c.r, tap(uv + vec2(d, 0.0)).r, 1.0);
-    c.b = mix(c.b, tap(uv - vec2(d, 0.0)).b, 1.0);
+    c.r = texture(u_tex, uv + vec2(d, 0.0)).r;
+    c.b = texture(u_tex, uv - vec2(d, 0.0)).b;
   }
   if (u_sharp > 0.0) {
     vec2 o = u_texel * u_sharpPx;
