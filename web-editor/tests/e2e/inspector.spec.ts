@@ -46,7 +46,7 @@ test('클립을 넣으면 속성 패널에 값이 표시되고, 미리보기에 
   await expect(page.getByTestId('prop-rotation')).toHaveValue('0');
   // 이미지에는 소리가 없으므로 소리 항목은 잠겨 있다
   await expect(page.getByTestId('prop-volume')).toBeDisabled();
-  await expect(page.getByTestId('prop-speed')).toHaveText('1배');
+  await expect(page.getByTestId('prop-speed')).toHaveCount(0); // 이미지에는 속도가 없다 (영상·오디오만)
   // 상자가 실제 그림 크기(1080×1080, 가운데)와 같다
   expect(await box(page)).toEqual({ cx: 540, cy: 960, w: 1080, h: 1080, rotation: 0 });
   await page.screenshot({ path: test.info().outputPath('inspector.png') });

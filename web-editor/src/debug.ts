@@ -60,6 +60,7 @@ export const debugApi: EditorDebugApi = {
   }),
   preview: () => previewRef.current?.stats() ?? null,
   clipGain: (clipId) => previewRef.current?.clipGain(clipId) ?? null,
+  mediaState: (clipId) => previewRef.current?.mediaState(clipId) ?? null,
   setPreviewResolution: (w, h) => previewRef.current?.resize(w, h, 1),
   setExportSize: (w, h) => setExportSizeOverride(w && h ? { width: w, height: h } : null),
   saveNow: () => saveNow(),

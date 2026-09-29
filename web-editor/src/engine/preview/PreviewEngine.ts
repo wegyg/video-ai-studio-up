@@ -19,7 +19,7 @@ import { useUI } from '../../store/ui';
 import { clipAt, drawFrame, type FrameSources } from '../compose';
 import { sharedEffects } from '../gl/effects';
 import { needsEffects } from '../../model/filters';
-import { sourceFrame, visibleRange } from '../../model/transitions';
+import { sourceFrame, srcAt, visibleRange } from '../../model/transitions';
 import { transformAt } from '../../model/keyframes';
 import { clipBox, containsPoint, textBox, type Box, type Point } from '../geometry';
 import { drawTextClip, layoutText } from '../text';
@@ -379,8 +379,12 @@ export class PreviewEngine {
     const local = frame - clip.start;
     const active = local >= 0 && local < clip.duration; // 소리가 나는 범위 = 클립 자기 범위
     // 화면: 트랜지션 구간(ext)에서는 원본의 앞뒤 여분을 이어서 재생하고, 여분이 없으면 끝 프레임에 멈춘다
-    const want = clip.inPoint + local;
+    const want = srcAt(clip, frame); // 원본 프레임 (속도 반영)
     const holding = srcFrames === undefined ? !active : want < 0 || want > srcFrames - 1;
+    const speed = clip.speed || 1;
+    // 속도: 요소 재생 속도 = 클립 속도, 음 높이 유지 여부는 브라우저 기능(preservesPitch)
+    const keep = clip.keepPitch !== false;
+    if (s.el.preservesPitch !== keep) s.el.preservesPitch = keep;
     const visible = clip.type === 'video' && frame >= ext.start && frame < ext.end && !holding;
     const shown = Math.min(Math.max(Math.floor(frame), ext.start), ext.end - 1);
     const frameSrc = sourceFrame(clip, shown, srcFrames) / FPS;
@@ -390,15 +394,16 @@ export class PreviewEngine {
         // 원본 끝까지 재생했다: 마지막 프레임에 멈춰 둔다 (끝난 요소에 play()를 부르면 처음으로 돌아간다)
       } else if (s.el.paused) {
         if (Math.abs(s.el.currentTime - exact) > 0.05) s.el.currentTime = exact + SEEK_EPS;
+        s.setRate(speed);
         s.forgetTarget();
         s.playStartedAt = performance.now();
         s.el.play().catch(() => undefined);
       } else if (!this.starting && s.advancing) {
         const drift = exact - s.el.currentTime; // +: 요소가 늦음
         const a = Math.abs(drift);
-        if (a > HARD_DRIFT) s.el.currentTime = exact;
-        else if (a > SOFT_DRIFT) s.setRate(1 + Math.max(-0.1, Math.min(0.1, drift * 1.5)));
-        else if (a < CALM_DRIFT) s.setRate(1);
+        if (a > HARD_DRIFT * speed) s.el.currentTime = exact;
+        else if (a > SOFT_DRIFT * speed) s.setRate(speed * (1 + Math.max(-0.1, Math.min(0.1, (drift * 1.5) / speed))));
+        else if (a < CALM_DRIFT * speed) s.setRate(speed);
         if (performance.now() - s.playStartedAt > 800) this.drifts.push({ t: performance.now(), d: a });
       }
       if (s.audio && this.audio) s.audio.gain.gain.setTargetAtTime(muted || !active ? 0 : gainAt(clip, frame), this.audio.ctx.currentTime, 0.015);
@@ -424,7 +429,7 @@ export class PreviewEngine {
     this.clockBase = this.now();
     // 기준 요소(첫 활성 미디어)의 실제 위치에 시계를 맞춰 시작 순간의 차이를 없앤다
     const ref = active.find((s) => s.advancing);
-    if (ref) this.frameBase = ref.clip.start + ref.el.currentTime * FPS - ref.clip.inPoint;
+    if (ref) this.frameBase = ref.clip.start + (ref.el.currentTime * FPS - ref.clip.inPoint) / (ref.clip.speed || 1);
     for (const s of active) s.playStartedAt = performance.now();
   }
 
@@ -564,6 +569,12 @@ export class PreviewEngine {
       if (box && containsPoint(p, box)) return c.id;
     }
     return null;
+  }
+
+  /** 이 클립 미디어 요소의 재생 속도·음 높이 유지 (테스트용) */
+  mediaState(clipId: string): { rate: number; preservesPitch: boolean; paused: boolean } | null {
+    const el = this.slots.get(clipId)?.el;
+    return el ? { rate: el.playbackRate, preservesPitch: el.preservesPitch, paused: el.paused } : null;
   }
 
   /**

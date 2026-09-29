@@ -39,6 +39,7 @@ export interface DebugState {
         fadeIn?: number;
         fadeOut?: number;
         speed?: number;
+        keepPitch?: boolean;
         transform?: { x: number; y: number; scale: number; rotation: number; opacity: number };
         // 텍스트 클립
         text?: string;
@@ -107,6 +108,8 @@ export interface EditorDebugApi {
   clipBox: (clipId?: string) => { cx: number; cy: number; w: number; h: number; rotation: number } | null;
   /** 미리보기가 이 클립에 적용 중인 소리 크기 (GainNode 값) */
   clipGain: (clipId: string) => number | null;
+  /** 미리보기 미디어 요소의 재생 속도·음 높이 유지 */
+  mediaState: (clipId: string) => { rate: number; preservesPitch: boolean; paused: boolean } | null;
   /** 미리보기 캔버스 해상도를 강제로 바꾼다 (진단용: 해상도 차이인지 내용 차이인지 가르기) */
   setPreviewResolution: (w: number, h: number) => void;
   /** 내보내기 해상도를 바꾼다 (0, 0이면 프로젝트 해상도로 되돌림) — 효과 비교를 작은 해상도로 빠르게 */

@@ -6,9 +6,11 @@
  *   휴대폰으로 찍은 큰 영상(수백 MB)도 빠르다.
  * - 표본율이 달라도(44.1kHz 등) 브라우저가 48kHz로 바꿔 준다.
  * - 볼륨·페이드는 미리보기와 같은 `gainAt`을 프레임마다 선형으로 이어 붙여 그대로 재현한다 (R8.4, G3).
+ * - 속도(R17): 음 높이 유지면 WSOLA로 늘이거나 줄이고(time-stretch.ts), 아니면 재생 속도를 바꾼다.
  */
 import { ALL_FORMATS, AudioBufferSink, BlobSource, Input, type InputAudioTrack } from 'mediabunny';
 import { gainAt } from '../../model/audio';
+import { timeStretch } from './time-stretch';
 import { isMedia } from '../../model/ops';
 import { FPS, type AssetMeta, type EditState, type MediaClip } from '../../model/types';
 import type { ExportAudio } from './protocol';
@@ -90,15 +92,29 @@ export async function mixExportAudio(
       }
       const track = await input.getPrimaryAudioTrack();
       if (!track || !(await track.canDecode())) continue; // 소리를 읽을 수 없는 파일은 건너뛴다 (가져올 때 이미 알렸다)
-      const buf = await decodeRange(track, clip.inPoint / FPS, (clip.inPoint + clip.duration) / FPS);
-      if (!buf) continue;
+      // 속도가 있으면 원본은 (길이 × 속도)만큼 쓴다
+      const speed = clip.speed || 1;
+      const raw = await decodeRange(track, clip.inPoint / FPS, (clip.inPoint + clip.duration * speed) / FPS);
+      if (!raw) continue;
 
       const src = ctx.createBufferSource();
+      let buf = raw;
+      if (speed !== 1 && clip.keepPitch !== false) {
+        // 음 높이 유지: 늘이거나 줄인 소리를 1배로 튼다 (time-stretch.ts)
+        const chans = Array.from({ length: raw.numberOfChannels }, (_, c) => raw.getChannelData(c));
+        const out = timeStretch(chans, speed, raw.sampleRate);
+        buf = new AudioBuffer({ length: out[0].length, numberOfChannels: out.length, sampleRate: raw.sampleRate });
+        out.forEach((d, c) => buf.copyToChannel(d, c));
+      } else if (speed !== 1) {
+        // 음 높이 유지 안 함: 빠르게/느리게 틀어 음 높이도 같이 바뀐다 (미리보기 preservesPitch=false와 같다)
+        src.playbackRate.value = speed;
+      }
       src.buffer = buf;
       const gain = ctx.createGain();
       const startSec = clip.start / FPS;
+      const playedSec = buf.duration / (buf === raw ? speed : 1);
       // 프레임마다 선형으로 이어 붙이면 gainAt 곡선과 프레임 경계에서 정확히 같아진다
-      const endFrame = clip.start + Math.min(clip.duration, Math.round(buf.duration * FPS));
+      const endFrame = clip.start + Math.min(clip.duration, Math.round(playedSec * FPS));
       gain.gain.setValueAtTime(gainAt(clip, clip.start), startSec);
       for (let f = clip.start + 1; f <= endFrame; f++) gain.gain.linearRampToValueAtTime(gainAt(clip, f), f / FPS);
       src.connect(gain).connect(ctx.destination);

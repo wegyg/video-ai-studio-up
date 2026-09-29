@@ -7,6 +7,7 @@ import { ko } from '../../i18n/ko';
 import { PEAKS_PER_SEC } from '../../media/derive-protocol';
 import { useMedia, type Filmstrip } from '../../media/store';
 import { keyOffsets, moveKeys } from '../../model/keyframes';
+import { srcAt } from '../../model/transitions';
 import { FPS, type Clip, type MediaClip } from '../../model/types';
 import { useProject } from '../../store/project';
 import { useUI } from '../../store/ui';
@@ -31,7 +32,7 @@ function drawFilmstrip(ctx: CanvasRenderingContext2D, f: Filmstrip, clip: MediaC
   const last = Math.ceil((visL + w) / tileW);
   for (let k = first; k < last; k++) {
     const localX = k * tileW;
-    const srcSec = (clip.inPoint + localX / ppf) / FPS;
+    const srcSec = srcAt(clip, clip.start + localX / ppf) / FPS;
     const idx = Math.min(f.count - 1, Math.max(0, Math.floor(srcSec / f.interval)));
     const sx = (idx % f.cols) * f.thumbW;
     const sy = Math.floor(idx / f.cols) * f.thumbH;
@@ -124,8 +125,8 @@ function ClipCanvas({ clip, width, height }: { clip: MediaClip; width: number; h
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, height);
     const peaks = entry?.peaks;
-    const s = (clip.inPoint + visL / ppf) / FPS;
-    const e = peaks ? Math.min((clip.inPoint + (visL + w) / ppf) / FPS, peaks.length / PEAKS_PER_SEC + 1) : 0;
+    const s = srcAt(clip, clip.start + visL / ppf) / FPS;
+    const e = peaks ? Math.min(srcAt(clip, clip.start + (visL + w) / ppf) / FPS, peaks.length / PEAKS_PER_SEC + 1) : 0;
     if (clip.type === 'video') {
       // 소리가 있는 영상: 위 = 필름스트립, 아래 띠 = 파형 (R4.3)
       const waveH = peaks ? Math.round(height * VIDEO_WAVE_RATIO) : 0;
@@ -246,6 +247,15 @@ export const ClipView = memo(function ClipView({ clip, rowKind, scroller }: { cl
       <span className="pointer-events-none absolute top-0.5 left-2 max-w-[calc(100%-1rem)] truncate rounded bg-black/40 px-1 text-[10px] text-white/90">
         {clip.type === 'text' ? clip.text : assetName}
       </span>
+      {(clip.type === 'video' || clip.type === 'audio') && clip.speed !== 1 && (
+        <span
+          data-testid="clip-speed-badge"
+          className="pointer-events-none absolute top-0.5 right-2 rounded bg-black/60 px-1 text-[10px] tabular-nums text-cyan-200"
+        >
+          {clip.speed}
+          {ko.inspector.units.times}
+        </span>
+      )}
       {hasAudio && clip.type !== 'text' && clip.volume !== 1 && (
         <span
           data-testid="clip-volume-badge"

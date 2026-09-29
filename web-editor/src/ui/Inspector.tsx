@@ -5,7 +5,7 @@
 import { actions } from '../actions';
 import { ko } from '../i18n/ko';
 import { hasAnyKeys, hasKeys, propsKeyedAt, transformAt, valueAt } from '../model/keyframes';
-import { findClip, isMedia } from '../model/ops';
+import { findClip, isMedia, SPEED_MAX, SPEED_MIN } from '../model/ops';
 import { FPS, type Clip, type Easing, type KeyProp, type MediaClip, type Transform } from '../model/types';
 import { useProject } from '../store/project';
 import { useUI } from '../store/ui';
@@ -227,14 +227,56 @@ function AudioFields({ clip, visible }: { clip: MediaClip; visible: boolean }) {
         disabled={!hasAudio}
         onCommit={(fadeOut) => set({ fadeOut })}
       />
-      <div className="flex items-center gap-2 text-xs">
-        <span className="w-16 shrink-0 text-neutral-400">{ko.inspector.speed}</span>
-        <span data-testid="prop-speed" className="tabular-nums text-neutral-300">
-          {clip.speed}
-          {ko.inspector.units.times}
-        </span>
-        <span className="text-[11px] text-neutral-500">{ko.inspector.speedLocked}</span>
+    </Section>
+  );
+}
+
+const SPEED_PRESETS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
+
+/** 속도 (R17): 프리셋 + 직접 입력 + 음 높이 유지. 영상·오디오 클립만 */
+function SpeedFields({ clip }: { clip: MediaClip }) {
+  return (
+    <Section title={ko.inspector.speed}>
+      <div className="flex flex-wrap gap-1" role="group" aria-label={ko.inspector.speed}>
+        {SPEED_PRESETS.map((v) => (
+          <button
+            key={v}
+            type="button"
+            data-testid="speed-preset"
+            data-speed={v}
+            aria-pressed={clip.speed === v}
+            onClick={() => actions.setSpeed(clip.id, v)}
+            className={
+              'rounded px-2 py-1 text-xs tabular-nums ' +
+              (clip.speed === v ? 'bg-cyan-600 font-bold text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700')
+            }
+          >
+            {v}
+            {ko.inspector.units.times}
+          </button>
+        ))}
       </div>
+      <NumberField
+        label={ko.inspector.speed}
+        testId="prop-speed"
+        value={clip.speed}
+        min={SPEED_MIN}
+        max={SPEED_MAX}
+        step={0.05}
+        unit={ko.inspector.units.times}
+        onCommit={(v) => actions.setSpeed(clip.id, v)}
+      />
+      <label className="flex items-center gap-2 text-xs text-neutral-300">
+        <input
+          type="checkbox"
+          data-testid="prop-keep-pitch"
+          checked={clip.keepPitch !== false}
+          onChange={(e) => actions.setKeepPitch(clip.id, e.target.checked)}
+          className="accent-cyan-400"
+        />
+        {ko.inspector.keepPitch}
+      </label>
+      <p className="text-[11px] leading-relaxed text-neutral-500">{ko.inspector.speedHint}</p>
     </Section>
   );
 }
@@ -272,6 +314,7 @@ export function Inspector() {
           {trackKind !== 'audio' && <TransformFields clip={clip} visible={visible} />}
           {clip.type === 'text' && <TextProps clip={clip} />}
           {isMedia(clip) && <AudioFields clip={clip} visible={visible} />}
+          {isMedia(clip) && clip.type !== 'image' && <SpeedFields clip={clip} />}
         </>
       )}
     </aside>

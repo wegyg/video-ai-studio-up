@@ -36,6 +36,8 @@ export interface ProjectState extends ProjectSnapshot {
   updateClip: (clipId: string, fn: (c: Clip) => Clip) => void;
   addTrack: (kind: TrackKind) => void;
   setTrackMuted: (trackId: string, muted: boolean) => void;
+  /** 재생 속도 (영상·오디오 클립, 0.25~4). 같은 트랙의 뒤 클립은 함께 밀리거나 당겨진다 */
+  setSpeed: (clipId: string, speed: number) => void;
   /** 캔버스 배경 (단색 / 흐림 채우기) */
   setBackground: (bg: CanvasBackground) => void;
   /** 저장된 프로젝트로 통째로 바꾼다 (실행 취소 기록은 비운다) */
@@ -99,6 +101,7 @@ export const useProject = create<ProjectState>()(
             return ops.addTrack(e, kind, name);
           }),
         setTrackMuted: (trackId, muted) => apply((e) => ops.setTrackMuted(e, trackId, muted)),
+        setSpeed: (clipId, speed) => apply((e) => ops.setClipSpeed(e, get().assets, clipId, speed)),
         setBackground: (bg) => apply((e) => (JSON.stringify(e.background) === JSON.stringify(bg) ? e : { ...e, background: bg })),
         replaceProject: (p) => {
           set({ id: p.id, name: p.name, assets: p.assets, edit: normalizeTransitions(p.edit) });

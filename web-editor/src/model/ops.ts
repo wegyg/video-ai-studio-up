@@ -166,6 +166,41 @@ export function moveClip(edit: EditState, clipId: string, toTrackId: string, toS
   };
 }
 
+/** 원본 프레임 위치는 소수 셋째 자리까지 (속도 때문에 소수가 된다) */
+const roundSrc = (v: number) => Math.round(v * 1000) / 1000;
+
+export const SPEED_MIN = 0.25;
+export const SPEED_MAX = 4;
+
+/**
+ * 속도 바꾸기 (R17). 쓰는 원본 구간(시작·길이)은 그대로 두고 타임라인 길이를 바꾼다: 새 길이 = 원본 구간 / 속도.
+ * 같은 트랙의 뒤 클립들은 길이가 바뀐 만큼 함께 밀리거나 당겨진다(맞닿은 곳·트랜지션이 그대로 유지된다).
+ * 다른 트랙(자막·BGM)은 움직이지 않는다. 키프레임은 같은 장면에 붙어 있도록 시각을 같은 비율로 바꾼다.
+ */
+export function setClipSpeed(edit: EditState, assets: Record<string, AssetMeta>, clipId: string, speed: number): EditState {
+  const loc = findClip(edit, clipId);
+  if (!loc || !isSourced(loc.clip)) return edit;
+  const c = loc.clip;
+  const s = Math.min(SPEED_MAX, Math.max(SPEED_MIN, Math.round(speed * 100) / 100));
+  if (s === c.speed) return edit;
+  let duration = Math.max(1, Math.round((c.duration * c.speed) / s));
+  const src = assets[c.assetId]?.durationFrames;
+  if (src !== undefined) duration = Math.min(duration, Math.max(1, Math.floor((src - c.inPoint) / s + 1e-6)));
+  const delta = duration - c.duration;
+  const ratio = c.speed / s;
+  let next: MediaClip = { ...c, speed: s, duration };
+  if (c.keyframes) {
+    const k: typeof c.keyframes = {};
+    for (const [p, list] of Object.entries(c.keyframes)) {
+      if (list?.length) k[p as keyof typeof k] = list.map((x) => ({ ...x, f: Math.round(x.f * ratio) }));
+    }
+    next = { ...next, keyframes: k };
+  }
+  next = clampFades(next);
+  const clips = loc.track.clips.map((x) => (x.id === clipId ? next : x.start > c.start ? { ...x, start: x.start + delta } : x));
+  return replaceTrack(edit, { ...loc.track, clips });
+}
+
 function clampFades<T extends Clip>(c: T): T {
   if (!isMedia(c)) return c;
   const fadeIn = Math.min(c.fadeIn, c.duration);
@@ -196,12 +231,12 @@ export function trimClip(
     const end = clipEnd(c);
     let min = 0;
     for (const o of others) if (o.start < c.start) min = Math.max(min, clipEnd(o));
-    if (isSourced(c)) min = Math.max(min, c.start - c.inPoint);
+    if (isSourced(c)) min = Math.max(min, c.start - Math.floor(c.inPoint / c.speed));
     const start = Math.min(Math.max(target, min), end - 1);
     if (start === c.start) return edit;
     const delta = start - c.start;
     next = isSourced(c)
-      ? { ...c, start, duration: end - start, inPoint: c.inPoint + delta }
+      ? { ...c, start, duration: end - start, inPoint: roundSrc(Math.max(0, c.inPoint + delta * c.speed)) }
       : { ...c, start, duration: end - start };
     // 키프레임은 타임라인의 같은 순간에 남는다 (클립 기준 시각이 delta만큼 당겨진다)
     if (c.keyframes) next = { ...next, keyframes: shiftKeyframes(c.keyframes, -delta) };
@@ -210,7 +245,7 @@ export function trimClip(
     for (const o of others) if (o.start > c.start) max = Math.min(max, o.start);
     if (isSourced(c)) {
       const src = assets[c.assetId]?.durationFrames;
-      if (src !== undefined) max = Math.min(max, c.start + (src - c.inPoint));
+      if (src !== undefined) max = Math.min(max, c.start + Math.floor((src - c.inPoint) / c.speed + 1e-6));
     }
     const end = Math.min(Math.max(target, c.start + 1), max);
     if (end === clipEnd(c)) return edit;
@@ -242,7 +277,7 @@ export function splitClip(edit: EditState, clipId: string, at: number): { edit: 
       id: rightId,
       start: cut,
       duration: rightDur,
-      inPoint: c.type === 'image' ? c.inPoint : c.inPoint + leftDur,
+      inPoint: c.type === 'image' ? c.inPoint : roundSrc(c.inPoint + leftDur * c.speed),
       fadeIn: 0,
       fadeOut: Math.min(c.fadeOut, rightDur),
     };

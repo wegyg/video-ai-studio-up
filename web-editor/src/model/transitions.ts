@@ -31,6 +31,10 @@ export const TRANSITION_DEFAULT = 15;
 export const TRANSITION_MIN = 3;
 export const TRANSITION_MAX = 60;
 
+/** 타임라인 프레임 → 원본 프레임 (속도 반영, 소수 가능. 범위를 자르지 않는다) */
+export const srcAt = (clip: Pick<MediaClip, 'inPoint' | 'start' | 'speed'>, frame: number): number =>
+  clip.inPoint + (frame - clip.start) * (clip.speed || 1);
+
 export const isVisualClip = (c: Clip | undefined | null): c is MediaClip => !!c && (c.type === 'video' || c.type === 'image');
 
 /** 경계 앞(앞 클립 안)에 걸치는 프레임 수 */
@@ -173,9 +177,9 @@ export function visibleRange(track: Track, clip: Clip): { start: number; end: nu
  */
 export function sourceFrame(clip: MediaClip, frame: number, sourceFrames?: number): number {
   if (clip.type === 'image') return 0;
-  const want = clip.inPoint + (frame - clip.start);
+  const want = srcAt(clip, frame);
   const lo = sourceFrames !== undefined ? 0 : clip.inPoint;
-  const hi = sourceFrames !== undefined ? Math.max(0, sourceFrames - 1) : clip.inPoint + clip.duration - 1;
+  const hi = sourceFrames !== undefined ? Math.max(0, sourceFrames - 1) : clip.inPoint + (clip.duration - 1) * clip.speed;
   return Math.min(hi, Math.max(lo, want));
 }
 

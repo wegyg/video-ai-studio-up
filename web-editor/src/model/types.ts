@@ -120,15 +120,17 @@ export interface MediaClip extends ClipBase {
   filter?: ClipFilter;
   /** 앞 클립에서 넘어오는 트랜지션 (영상·이미지만). 없으면 바로 바뀐다 */
   transitionIn?: Transition;
-  /** 원본에서의 시작 프레임 (이미지는 항상 0) */
+  /** 원본에서의 시작 프레임 (이미지는 항상 0). 속도가 1이 아니면 소수일 수 있다 */
   inPoint: number;
   /** 1 = 100% (0~2) */
   volume: number;
   /** 페이드 길이(프레임) */
   fadeIn: number;
   fadeOut: number;
-  /** 1단계에서는 1배 고정 */
-  speed: 1;
+  /** 재생 속도 0.25~4 (R17). 타임라인 1프레임 = 원본 speed프레임 */
+  speed: number;
+  /** 속도를 바꿔도 음 높이 유지 (없으면 유지) */
+  keepPitch?: boolean;
   /** 오디오 클립은 사용하지 않음 */
   transform: Transform;
 }

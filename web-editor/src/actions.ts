@@ -233,6 +233,13 @@ export const actions = {
     const f = dir < 0 ? [...inside].reverse().find((x) => x < now) : inside.find((x) => x > now);
     if (f !== undefined) actions.seek(c.start + f);
   },
+  /** 재생 속도 0.25~4 (R17). 클립 길이가 바뀌고 같은 트랙의 뒤 클립이 함께 움직인다 */
+  setSpeed(clipId: string, speed: number): void {
+    useProject.getState().setSpeed(clipId, speed);
+  },
+  setKeepPitch(clipId: string, keep: boolean): void {
+    useProject.getState().updateClip(clipId, (c) => (c.type === 'text' || (c.keepPitch !== false) === keep ? c : { ...c, keepPitch: keep }));
+  },
   /** 화면 배치 초기화: 배치 키프레임도 지운다 */
   resetTransform(clipId: string): void {
     useProject.getState().updateClip(clipId, (c) => {

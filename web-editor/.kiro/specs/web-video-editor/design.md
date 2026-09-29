@@ -240,6 +240,11 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
 - 고치기: 키가 있는 속성은 플레이헤드 시각의 키를 고치거나 새로 만든다(속성 패널·미리보기 끌기 공통 `setValues`). 앞 자르기·나누기는 키 오프셋을 옮겨 타임라인의 같은 순간에 남긴다. 범위 밖 키도 남겨 값이 끊기지 않게 한다.
 - 내보내기 디코딩 크기는 키 중 가장 큰 크기 기준(확대해도 흐려지지 않게).
 
+### 속도 (2-4)
+- `speed`(0.25~4): 원본 프레임 = `inPoint + (타임라인 프레임 − 시작) × speed` (`srcAt`). 트랜지션 여분·자르기·나누기·필름스트립·파형이 모두 이 식을 쓴다.
+- 속도를 바꾸면 쓰는 원본 구간을 유지한 채 길이를 바꾸고, 같은 트랙의 뒤 클립을 그만큼 옮긴다(맞닿은 곳·트랜지션 유지). 자막·BGM이 있는 다른 트랙은 옮기지 않는다.
+- 소리: 미리보기는 `playbackRate` + `preservesPitch`. 내보내기는 음 높이 유지면 WSOLA(창 40ms Hann, 50% 겹침, ±10ms 안에서 가장 잘 이어지는 곳 찾기, 모든 채널 같은 위치), 아니면 `AudioBufferSourceNode.playbackRate`.
+
 ### 원본 색 해석 맞추기 (`media/color.ts`)
 미리보기는 `<video>`가, 내보내기는 WebCodecs(Mediabunny)가 원본을 푼다. 원본에 색 정보(primaries·transfer·matrix)가 셋 다 있지 않으면:
 - Chrome `<video>`: 모두 버리고 세로(natural) 720 미만은 BT.601, 이상은 BT.709로 가정 (Chromium `media/ffmpeg/ffmpeg_common.cc`, VP9·AV1 제외)
