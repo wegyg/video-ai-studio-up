@@ -1,6 +1,7 @@
 /** 태스크 2: 레이아웃, 비율 전환, 단축키, 한국어 UI */
 import { expect, test, type Page } from '@playwright/test';
 import '../../src/debug-types';
+import { fixture } from './fixtures';
 
 const state = (page: Page) => page.evaluate(() => window.__editor.state());
 
@@ -71,12 +72,27 @@ test('비율 전환: 9:16 → 16:9 → 1:1', async ({ page }) => {
   expect((await state(page)).edit.ratio).toBe('1:1');
 });
 
+/** 빈 타임라인은 재생되지 않으므로(태스크 5) 재생 관련 테스트는 이미지 클립 하나를 넣고 시작한다 */
+async function withClip(page: Page) {
+  await page.getByTestId('import-input').setInputFiles(fixture('image.png'));
+  await expect(page.locator('[data-testid=media-item][data-status=ready]')).toHaveCount(1);
+  await page.getByTestId('add-to-timeline').click();
+  await page.locator('body').click({ position: { x: 700, y: 300 } }); // 포커스를 버튼 밖으로
+}
+
+test('빈 타임라인은 재생되지 않는다', async ({ page }) => {
+  await page.keyboard.press('Space');
+  await expect.poll(async () => (await state(page)).ui.playing).toBe(false);
+});
+
 test('단축키: 스페이스바 재생/정지, ←/→ 1프레임, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z', async ({ page }) => {
+  await withClip(page);
   await page.keyboard.press('Space');
   expect((await state(page)).ui.playing).toBe(true);
   await page.keyboard.press('Space');
   expect((await state(page)).ui.playing).toBe(false);
 
+  await page.getByTestId('ruler').click({ position: { x: 0, y: 10 } }); // 재생으로 움직인 플레이헤드를 0으로
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
   await expect(page.getByTestId('time-current')).toHaveText('00:00.02');
@@ -98,6 +114,7 @@ test('단축키: 스페이스바 재생/정지, ←/→ 1프레임, Ctrl+Z / Ctr
 });
 
 test('버튼에 포커스가 있어도 스페이스바는 한 번만 재생/정지', async ({ page }) => {
+  await withClip(page);
   await page.getByTestId('play').click();
   expect((await state(page)).ui.playing).toBe(true);
   await page.keyboard.press('Space'); // 포커스된 재생 버튼이 다시 눌리면 두 번 토글되어 true로 남는다

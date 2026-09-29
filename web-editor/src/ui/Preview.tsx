@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { actions } from '../actions';
+import { PreviewEngine, previewRef } from '../engine/preview/PreviewEngine';
 import { ko, withKey } from '../i18n/ko';
 import { editDuration, formatTimecode } from '../model/time';
 import { RATIO_SIZE, RATIOS } from '../model/types';
@@ -81,10 +82,31 @@ function PlayButton() {
   );
 }
 
+/** 미리보기 엔진을 캔버스에 붙이고, 상자 크기가 바뀌면 캔버스 해상도를 맞춘다 */
+function usePreviewEngine(box: { w: number; h: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<PreviewEngine | null>(null);
+  useEffect(() => {
+    const e = new PreviewEngine(canvasRef.current!);
+    engineRef.current = e;
+    previewRef.current = e;
+    return () => {
+      e.dispose();
+      if (previewRef.current === e) previewRef.current = null;
+      engineRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    engineRef.current?.resize(box.w, box.h, window.devicePixelRatio || 1);
+  }, [box]);
+  return canvasRef;
+}
+
 export function Preview() {
   const ratio = useProject((s) => s.edit.ratio);
   const { width, height } = RATIO_SIZE[ratio];
   const { stageRef, box } = useFittedBox(width, height);
+  const canvasRef = usePreviewEngine(box);
   return (
     <section aria-label={ko.preview.region} className="flex min-w-0 flex-1 flex-col bg-neutral-950">
       <div className="flex h-10 shrink-0 items-center justify-center">
@@ -97,7 +119,7 @@ export function Preview() {
           className="relative bg-black shadow-lg shadow-black/50"
           style={{ width: box.w, height: box.h }}
         >
-          <canvas data-testid="preview-canvas" className="absolute inset-0 block h-full w-full" />
+          <canvas ref={canvasRef} data-testid="preview-canvas" className="absolute inset-0 block h-full w-full" />
         </div>
       </div>
       <div className="flex h-11 shrink-0 items-center justify-center gap-4 border-t border-neutral-800">

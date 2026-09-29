@@ -11,7 +11,7 @@
 
 ---
 
-- [ ] **0. 프로젝트 골격 + 기술 검증 스파이크**
+- [x] **0. 프로젝트 골격 + 기술 검증 스파이크**
   - `web-editor/`에 Vite + React + TS + Tailwind v4 골격을 만들고 버전을 고정한다. Vite 8/TS 7에서 빌드가 실패하면 이전 메이저로 낮추고 design.md 표를 고친다.
   - Playwright 설정(`chrome` 프로젝트 하나, `vite preview` webServer)
   - 테스트 파일: H.264/AAC mp4, mov, png, jpg, mp3, wav (각각 짧게, 커밋)
@@ -19,19 +19,19 @@
   - 확인할 문서: CanvasSource 하드웨어 가속 옵션, zundo pause/resume
   - _요구사항: R1.1, R1.4, 설계 §1–2_
 
-- [ ] **1. 데이터 모델 + 편집 연산 + 스토어**
+- [x] **1. 데이터 모델 + 편집 연산 + 스토어**
   - `model/types.ts`, `ops.ts`(move/trim/split/delete/resolveOverlap), `snap.ts`, `time.ts`, Vitest 단위 테스트
   - `store/project.ts`(zustand + zundo, partialize), `store/ui.ts`
   - _요구사항: R5.1–R5.6, R9.3_
 
-- [ ] **2. 레이아웃 셸 + 한국어 문자열 + 단축키**
+- [x] **2. 레이아웃 셸 + 한국어 문자열 + 단축키**
   - 좌측 탭 / 중앙 미리보기 / 우측 속성 / 하단 타임라인 뼈대, `i18n/ko.ts`
   - 비율 전환(9:16, 16:9, 1:1), `shortcuts.ts`(입력 칸 포커스 예외)
   - WebCodecs 미지원/file:// 안내 화면 (R1.3)
   - E2E: 레이아웃 표시, 비율 전환, 영어 UI 문자열 grep 0건 검사
   - _요구사항: R1.3, R2, R3, R9.1–R9.2_
 
-- [ ] **2.5 GitHub Pages 자동 배포** *(추가)*
+- [x] **2.5 GitHub Pages 자동 배포** *(추가)*
   - Pages 소스: `gh-pages` 브랜치. 저장소 설정 API는 샌드박스 인증으로 403이라 쓸 수 없었다. `gh-pages` 브랜치를 올리면 Pages가 자동으로 켜진다(design.md §12)
   - 워크플로 `.github/workflows/web-editor-pages.yml`: ubuntu-latest에서 `npm ci` → 단위 테스트 → `npm run build` → Playwright(chrome) 테스트 → 통과하면 `web-editor/dist`를 `gh-pages`에 올린다. 테스트가 실패하면 배포하지 않는다
   - 트리거: 작업 브랜치에 push(`web-editor/**` 변경 시) + 수동 실행
@@ -39,24 +39,25 @@
   - 이 태스크 이후로는 태스크가 끝날 때마다 배포하고 접속 주소를 보고한다
   - _요구사항: R1.1, R1.2_
 
-- [ ] **3. 미디어 가져오기 + IndexedDB 미디어 저장 + 썸네일/필름스트립/파형**
+- [x] **3. 미디어 가져오기 + IndexedDB 미디어 저장 + 썸네일/필름스트립/파형**
   - 드래그앤드롭/파일 선택, 메타데이터(Mediabunny), 디코딩 불가 파일 거부 메시지
   - `storage/` media·derived 저장소, 필름스트립, 파형 피크
   - E2E: 6가지 형식 가져오기, 썸네일 표시, 잘못된 파일 거부
   - _요구사항: R4.1–R4.4, R10.2_
 
-- [ ] **4. 타임라인 편집**
+- [x] **4. 타임라인 편집**
   - 트랙(영상 2 + 텍스트 1 + 오디오 1, 추가 가능), 클립 렌더(필름스트립/파형), 미디어 패널에서 끌어 넣기
   - 드래그 이동, 양끝 트림, 분할, 삭제, 스냅, 겹침 보정, 줌 슬라이더/Ctrl+휠, 플레이헤드 드래그
   - E2E: 끌어 넣기 → 이동 → 트림 → S 분할 → Delete → Ctrl+Z/Ctrl+Y
   - _요구사항: R4.5, R5, R9_
 
-- [ ] **5. 실시간 미리보기 엔진**
+- [x] **5. 실시간 미리보기 엔진**
   - `engine/compose.ts drawFrame`, 재생 시계(AudioContext), `<video>` 풀, 이미지 캐시, 스크럽, ←/→ 프레임 이동, 시간 표시
   - 오디오 그래프(볼륨/페이드 `gainAt`)
   - E2E: 재생 후 시간 증가, 스크럽한 프레임의 픽셀이 해당 소스와 일치
   - _요구사항: R3.3, R6.1–R6.3, R6.5_
-  - **⏸ 사용자 확인 1:** Windows Chrome 확인 시나리오 3줄을 전달하고 멈춘다. 사용자의 실제 촬영본으로 미리보기가 끊기는지도 이때 확인한다(태스크 12 진행 여부 결정)
+  - **⏸ 사용자 확인 1 — 대기 중:** Windows Chrome 확인 시나리오 3줄을 전달하고 멈춘다. 사용자의 실제 촬영본으로 미리보기가 끊기는지도 이때 확인한다(태스크 12 진행 여부 결정)
+  - 성능 측정(샌드박스, GPU 없음): `docs/perf.md`
 
 - [ ] **6. 미리보기 직접 조작 + 우측 속성 패널**
   - 선택 상자, 이동/크기/회전 핸들, hitTest, Shift 비율 유지, 15° 스냅

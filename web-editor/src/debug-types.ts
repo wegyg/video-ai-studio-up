@@ -55,6 +55,21 @@ export interface EditorDebugApi {
   filmstripPixel: (assetId: string, index: number) => number[] | null;
   /** IndexedDB에 저장된 원본/파생 데이터 */
   stored: () => Promise<{ media: { id: string; size: number; name: string }[]; derivedKeys: string[] }>;
+  /** 미리보기 엔진 상태 */
+  preview: () => {
+    playing: boolean;
+    starting: boolean;
+    renderedFrame: number;
+    ready: boolean;
+    slots: number;
+    audioState: string;
+    level: number;
+    maxDrift: number;
+    drawFps: number;
+    maxGapMs: number;
+  } | null;
+  /** 미리보기 캔버스의 (x, y) 비율 위치 픽셀 [r,g,b] (0~1, 기본 가운데) */
+  previewPixel: (fx?: number, fy?: number) => number[];
   [key: string]: unknown;
 }
 

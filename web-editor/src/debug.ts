@@ -1,5 +1,6 @@
 /** 테스트용 창구: window.__editor. 편집기 내부 상태를 읽기 전용 데이터로 노출한다. */
 import type { EditorDebugApi } from './debug-types';
+import { previewRef } from './engine/preview/PreviewEngine';
 import { useMedia } from './media/store';
 import { db, listMediaSizes } from './storage/db';
 import { useProject } from './store/project';
@@ -54,6 +55,12 @@ export const debugApi: EditorDebugApi = {
     media: await listMediaSizes(),
     derivedKeys: (await (await db()).getAllKeys('derived')).map(String),
   }),
+  preview: () => previewRef.current?.stats() ?? null,
+  previewPixel: (fx = 0.5, fy = 0.5) => {
+    const c = document.querySelector<HTMLCanvasElement>('[data-testid=preview-canvas]')!;
+    const d = c.getContext('2d')!.getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data;
+    return [d[0], d[1], d[2]];
+  },
 };
 
 export function installDebugApi(): void {

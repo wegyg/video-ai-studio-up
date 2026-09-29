@@ -251,6 +251,17 @@ export function Timeline() {
 
   useZoomAnchor(scroller, ppf);
 
+  // 재생 중 플레이헤드가 화면 밖으로 나가면 따라가며 넘긴다
+  useEffect(() => {
+    if (!scroller) return;
+    return useUI.subscribe((s, p) => {
+      if (!s.playing || s.playhead === p.playhead) return;
+      const x = s.playhead * s.pxPerFrame;
+      const w = scroller.clientWidth - HEADER_W;
+      if (x > scroller.scrollLeft + w - 24 || x < scroller.scrollLeft) scroller.scrollLeft = Math.max(0, x - 24);
+    });
+  }, [scroller]);
+
   const laneWidth = Math.max(viewW - HEADER_W, Math.ceil((duration + TAIL_FRAMES) * ppf));
   const contentH = RULER_H + tracks.reduce((h, t) => h + ROW_H[t.kind], 0);
 
