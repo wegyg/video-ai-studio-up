@@ -19,6 +19,7 @@ import { useUI } from '../../store/ui';
 import { clipAt, drawFrame, type FrameSources } from '../compose';
 import { sharedEffects } from '../gl/effects';
 import { needsEffects } from '../../model/filters';
+import { sourceFrame, visibleRange } from '../../model/transitions';
 import { clipBox, containsPoint, textBox, type Box, type Point } from '../geometry';
 import { drawTextClip, layoutText } from '../text';
 import { ensureFont, isFontLoaded, type FontFamily, type FontWeight } from '../../fonts';
@@ -57,6 +58,15 @@ class AudioGraph {
     for (let i = 0; i < this.buf.length; i++) s += this.buf[i] * this.buf[i];
     return Math.sqrt(s / this.buf.length);
   }
+}
+
+interface Want {
+  clip: MediaClip;
+  muted: boolean;
+  /** 화면에 보이는 구간 (트랜지션이 있으면 클립 범위보다 넓다) */
+  ext: { start: number; end: number };
+  /** 원본 전체 프레임 수 (모르면 여분을 쓰지 않는다) */
+  srcFrames: number | undefined;
 }
 
 class Slot {
@@ -329,12 +339,17 @@ export class PreviewEngine {
   }
 
   private syncSlots(edit: EditState, frame: number): void {
-    const want = new Map<string, { clip: MediaClip; muted: boolean }>();
+    const want = new Map<string, Want>();
     for (const tr of edit.tracks) {
       if (tr.kind === 'text') continue;
       for (const c of tr.clips) {
         if (c.type !== 'video' && c.type !== 'audio') continue;
-        if (frame >= c.start - PRELOAD && frame < c.start + c.duration + KEEP) want.set(c.id, { clip: c, muted: tr.muted });
+        // 트랜지션 구간에서는 자기 범위 밖에서도 보인다 (model/transitions.ts)
+        const ext = visibleRange(tr, c);
+        if (frame >= ext.start - PRELOAD && frame < ext.end + KEEP) {
+          const srcFrames = useProject.getState().assets[c.assetId]?.durationFrames;
+          want.set(c.id, { clip: c, muted: tr.muted, ext, srcFrames });
+        }
       }
     }
     for (const [id, s] of this.slots) {
@@ -344,7 +359,8 @@ export class PreviewEngine {
         this.slots.delete(id);
       }
     }
-    for (const [id, { clip, muted }] of want) {
+    for (const [id, w] of want) {
+      const { clip } = w;
       let s = this.slots.get(id);
       if (!s) {
         const url = useMedia.getState().entries[clip.assetId]?.url;
@@ -354,17 +370,24 @@ export class PreviewEngine {
         this.routeAudio(s);
       }
       s.clip = clip;
-      this.control(s, clip, muted, frame);
+      this.control(s, w, frame);
     }
   }
 
-  private control(s: Slot, clip: MediaClip, muted: boolean, frame: number): void {
+  private control(s: Slot, { clip, muted, ext, srcFrames }: Want, frame: number): void {
     const local = frame - clip.start;
-    const active = local >= 0 && local < clip.duration;
-    const frameSrc = (clip.inPoint + Math.min(Math.max(Math.floor(local), 0), clip.duration - 1)) / FPS;
-    if (this.playing && active) {
-      const exact = (clip.inPoint + local) / FPS;
-      if (s.el.paused) {
+    const active = local >= 0 && local < clip.duration; // 소리가 나는 범위 = 클립 자기 범위
+    // 화면: 트랜지션 구간(ext)에서는 원본의 앞뒤 여분을 이어서 재생하고, 여분이 없으면 끝 프레임에 멈춘다
+    const want = clip.inPoint + local;
+    const holding = srcFrames === undefined ? !active : want < 0 || want > srcFrames - 1;
+    const visible = clip.type === 'video' && frame >= ext.start && frame < ext.end && !holding;
+    const shown = Math.min(Math.max(Math.floor(frame), ext.start), ext.end - 1);
+    const frameSrc = sourceFrame(clip, shown, srcFrames) / FPS;
+    if (this.playing && (active || visible)) {
+      const exact = want / FPS;
+      if (s.el.ended && exact >= s.el.duration - 0.05) {
+        // 원본 끝까지 재생했다: 마지막 프레임에 멈춰 둔다 (끝난 요소에 play()를 부르면 처음으로 돌아간다)
+      } else if (s.el.paused) {
         if (Math.abs(s.el.currentTime - exact) > 0.05) s.el.currentTime = exact + SEEK_EPS;
         s.forgetTarget();
         s.playStartedAt = performance.now();
@@ -377,7 +400,7 @@ export class PreviewEngine {
         else if (a < CALM_DRIFT) s.setRate(1);
         if (performance.now() - s.playStartedAt > 800) this.drifts.push({ t: performance.now(), d: a });
       }
-      if (s.audio && this.audio) s.audio.gain.gain.setTargetAtTime(muted ? 0 : gainAt(clip, frame), this.audio.ctx.currentTime, 0.015);
+      if (s.audio && this.audio) s.audio.gain.gain.setTargetAtTime(muted || !active ? 0 : gainAt(clip, frame), this.audio.ctx.currentTime, 0.015);
     } else {
       if (!s.el.paused) {
         s.el.pause();

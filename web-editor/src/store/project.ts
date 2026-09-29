@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { ko } from '../i18n/ko';
 import * as ops from '../model/ops';
+import { normalizeTransitions } from '../model/transitions';
 import type { AssetMeta, CanvasBackground, Clip, EditState, Ratio, TrackKind } from '../model/types';
 
 export interface ProjectSnapshot {
@@ -52,7 +53,10 @@ export const useProject = create<ProjectState>()(
     (set, get) => {
       const apply = (fn: (e: EditState) => EditState): boolean => {
         const cur = get().edit;
-        const next = fn(cur);
+        let next = fn(cur);
+        // 트랜지션 정리(맞닿지 않은 경계의 것 지우기)는 드래그가 끝날 때 한 번 한다 — 끌다가 제자리로 오면 남아 있게.
+        // 드래그 중에는 기록이 멈춰 있고(history.beginGesture), 끝날 때 history.endGesture가 정리한다.
+        if (next !== cur && useProject.temporal.getState().isTracking) next = normalizeTransitions(next);
         if (next === cur) return false;
         set({ edit: next });
         return true;
@@ -69,7 +73,7 @@ export const useProject = create<ProjectState>()(
           if (!s.assets[id]) return;
           const rest = { ...s.assets };
           delete rest[id];
-          const edit = ops.removeAssetClips(s.edit, id);
+          const edit = normalizeTransitions(ops.removeAssetClips(s.edit, id));
           set({ assets: rest, ...(edit === s.edit ? {} : { edit }) });
         },
         addClip: (trackId, clip) => (apply((e) => ops.addClip(e, trackId, clip)) ? clip.id : null),
@@ -97,7 +101,7 @@ export const useProject = create<ProjectState>()(
         setTrackMuted: (trackId, muted) => apply((e) => ops.setTrackMuted(e, trackId, muted)),
         setBackground: (bg) => apply((e) => (JSON.stringify(e.background) === JSON.stringify(bg) ? e : { ...e, background: bg })),
         replaceProject: (p) => {
-          set({ id: p.id, name: p.name, assets: p.assets, edit: p.edit });
+          set({ id: p.id, name: p.name, assets: p.assets, edit: normalizeTransitions(p.edit) });
           useProject.temporal.getState().clear();
         },
       };

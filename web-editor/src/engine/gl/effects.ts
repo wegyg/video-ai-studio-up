@@ -1,5 +1,5 @@
 /**
- * WebGL2 효과 처리기 — 필터·색 조정(R15), 흐림 배경(R18). 트랜지션·영상 효과도 여기에 붙는다.
+ * WebGL2 효과 처리기 — 필터·색 조정(R15), 흐림 배경(R18), 트랜지션(R14). 영상 효과도 여기에 붙는다.
  *
  * - 미리보기(메인 스레드)와 내보내기(Worker)가 **같은 코드**를 쓴다 (R0.3, R11.8).
  * - 입력은 먼저 2D 캔버스에 필요한 크기로 그린 뒤 올린다. 이렇게 하면
@@ -84,6 +84,105 @@ void main() {
   outColor = acc / wsum;
 }`;
 
+/**
+ * 트랜지션 11종 (R14). u_a = 앞 화면, u_b = 새 화면 (둘 다 알파가 곱해진 텍스처, 0행 = 위쪽).
+ * u_kind 번호는 model/transitions.ts의 TRANSITION_KINDS 순서와 같다.
+ * 무작위처럼 보이는 값(글리치)은 정수 해시로 만든다 → 미리보기와 내보내기(다른 GL 컨텍스트)가 같은 결과.
+ */
+const FS_TRANSITION = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_a;
+uniform sampler2D u_b;
+uniform float u_p;
+uniform int u_kind;
+uniform float u_aspect; // 가로/세로 — 흐림·흔들림을 동그랗게
+out vec4 outColor;
+
+bool inside(vec2 uv) { return uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0; }
+vec4 A(vec2 uv) { return inside(uv) ? texture(u_a, uv) : vec4(0.0); }
+vec4 B(vec2 uv) { return inside(uv) ? texture(u_b, uv) : vec4(0.0); }
+float ease(float t) { return t * t * (3.0 - 2.0 * t); }
+vec2 zoom(vec2 uv, float s) { return (uv - 0.5) / s + 0.5; }
+float hash(uint x, uint y) {
+  uint h = x * 747796405u + y * 2891336453u + 12345u;
+  h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;
+  return float(h & 0xffffffu) / 16777215.0;
+}
+vec4 blurA(vec2 uv, float r) {
+  vec4 acc = vec4(0.0); float ws = 0.0;
+  for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++) {
+    vec2 o = vec2(float(i), float(j)) * 0.5;
+    float w = exp(-dot(o, o) * 1.5);
+    acc += texture(u_a, uv + o * vec2(r, r * u_aspect)) * w; ws += w;
+  }
+  return acc / ws;
+}
+vec4 blurB(vec2 uv, float r) {
+  vec4 acc = vec4(0.0); float ws = 0.0;
+  for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++) {
+    vec2 o = vec2(float(i), float(j)) * 0.5;
+    float w = exp(-dot(o, o) * 1.5);
+    acc += texture(u_b, uv + o * vec2(r, r * u_aspect)) * w; ws += w;
+  }
+  return acc / ws;
+}
+
+void main() {
+  vec2 uv = v_uv;
+  float p = clamp(u_p, 0.0, 1.0);
+  float e = ease(p);
+  const float PI = 3.14159265;
+  vec4 c;
+  if (u_kind == 0) {            // 디졸브
+    c = mix(texture(u_a, uv), texture(u_b, uv), p);
+  } else if (u_kind == 1) {     // 슬라이드 ←: 앞 화면이 왼쪽으로 나가고 새 화면이 오른쪽에서 들어온다
+    c = A(uv + vec2(e, 0.0)) + B(uv + vec2(e - 1.0, 0.0));
+  } else if (u_kind == 2) {     // 슬라이드 →
+    c = A(uv - vec2(e, 0.0)) + B(uv - vec2(e - 1.0, 0.0));
+  } else if (u_kind == 3) {     // 슬라이드 ↑
+    c = A(uv + vec2(0.0, e)) + B(uv + vec2(0.0, e - 1.0));
+  } else if (u_kind == 4) {     // 슬라이드 ↓
+    c = A(uv - vec2(0.0, e)) + B(uv - vec2(0.0, e - 1.0));
+  } else if (u_kind == 5) {     // 줌 인: 새 화면이 가운데에서 커지며 덮는다 (앞 화면도 살짝 다가온다)
+    vec4 a = texture(u_a, zoom(uv, 1.0 + 0.25 * e));
+    vec4 b = B(zoom(uv, max(e, 0.001))) * smoothstep(0.0, 0.25, p);
+    c = b + a * (1.0 - b.a);
+  } else if (u_kind == 6) {     // 줌 아웃: 앞 화면이 가운데로 작아지며 빠지고 새 화면이 드러난다
+    vec4 b = texture(u_b, zoom(uv, 1.15 - 0.15 * e));
+    vec4 a = A(zoom(uv, max(1.0 - e, 0.001))) * (1.0 - smoothstep(0.75, 1.0, p));
+    c = a + b * (1.0 - a.a);
+  } else if (u_kind == 7) {     // 와이프: 왼쪽부터 새 화면으로 닦아 낸다
+    float w = 0.03;
+    float edge = e * (1.0 + 2.0 * w) - w;
+    c = mix(texture(u_b, uv), texture(u_a, uv), smoothstep(edge - w, edge + w, uv.x));
+  } else if (u_kind == 8) {     // 블러: 앞 화면이 흐려지고, 흐린 새 화면이 또렷해진다
+    float r = 0.05 * sin(PI * p);
+    float q = smoothstep(0.35, 0.65, p);
+    if (q <= 0.0) c = blurA(uv, r);
+    else if (q >= 1.0) c = blurB(uv, r);
+    else c = mix(blurA(uv, r), blurB(uv, r), q);
+  } else if (u_kind == 9) {     // 흔들림: 화면이 흔들리는 사이에 바뀐다
+    float amp = sin(PI * p);
+    vec2 o = amp * vec2(0.035 * sin(p * 71.0), 0.035 * u_aspect * cos(p * 53.0));
+    vec2 s = zoom(uv, 1.0 + 0.12 * amp) + o;
+    c = mix(texture(u_a, s), texture(u_b, s), smoothstep(0.45, 0.55, p));
+  } else {                      // 글리치: 가로줄이 어긋나고 색이 갈라지며 바뀐다
+    float g = sin(PI * p);
+    uint row = uint(floor(uv.y * 28.0));
+    uint stp = uint(floor(p * 14.0));
+    float dx = (hash(row, stp) - 0.5) * 0.2 * g * (hash(row + 97u, stp) > 0.45 ? 1.0 : 0.0);
+    vec2 s = uv + vec2(dx, 0.0);
+    float split = 0.012 * g;
+    bool useB = p + (hash(row, stp + 31u) - 0.5) * 0.5 * g >= 0.5;
+    vec4 r = useB ? texture(u_b, s + vec2(split, 0.0)) : texture(u_a, s + vec2(split, 0.0));
+    vec4 m = useB ? texture(u_b, s) : texture(u_a, s);
+    vec4 b = useB ? texture(u_b, s - vec2(split, 0.0)) : texture(u_a, s - vec2(split, 0.0));
+    c = vec4(r.r, m.g, b.b, m.a);
+  }
+  outColor = vec4(min(c.rgb, vec3(c.a)), c.a);
+}`;
+
 interface Program {
   prog: WebGLProgram;
   u: Record<string, WebGLUniformLocation | null>;
@@ -118,8 +217,10 @@ export class GLEffects implements Effects {
   private gl: GL;
   private filterProg: Program;
   private blurProg: Program;
+  private transProg: Program;
   private vao: WebGLVertexArrayObject;
   private srcTex: WebGLTexture;
+  private srcTex2: WebGLTexture;
   private targets = new Map<string, Target>();
   private scratch = new OffscreenCanvas(1, 1);
   private scratchCtx: Ctx2;
@@ -143,6 +244,7 @@ export class GLEffects implements Effects {
     });
     this.filterProg = this.program(FS_FILTER, ['u_tex', 'u_texel', 'u_sharpPx', 'u_adj', 'u_sharp', 'u_vig', 'u_flipY']);
     this.blurProg = this.program(FS_BLUR, ['u_tex', 'u_step', 'u_sigma', 'u_flipY']);
+    this.transProg = this.program(FS_TRANSITION, ['u_a', 'u_b', 'u_p', 'u_kind', 'u_aspect', 'u_flipY']);
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
     const buf = gl.createBuffer();
@@ -151,6 +253,7 @@ export class GLEffects implements Effects {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     this.srcTex = this.texture();
+    this.srcTex2 = this.texture();
     this.scratchCtx = this.scratch.getContext('2d')!;
   }
 
@@ -311,6 +414,39 @@ export class GLEffects implements Effects {
     this.toCanvas(sw, sh);
     this.drawBlur(b.tex, sw, sh, 0, 1, sigma, true);
     return { image: this.canvas, sx: 0, sy: 0, sw, sh };
+  }
+
+  /**
+   * 트랜지션 (R14): 같은 크기(w×h)의 두 장면 a(앞)·b(새)를 progress(0~1)만큼 섞는다.
+   * 두 장면은 합성기가 클립 배치·필터까지 그려 둔 캔버스라 그대로 올린다 (알파를 곱한 채로 → 가장자리에 검은 테가 생기지 않는다).
+   */
+  transition(a: CanvasImageSource, b: CanvasImageSource, kind: number, progress: number, w: number, h: number): EffectImage | null {
+    if (!this.usable) return null;
+    const gl = this.gl;
+    const [tw, th] = fitSize(w, h);
+    const put = (unit: number, tex: WebGLTexture, img: CanvasImageSource) => {
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img as TexImageSource);
+    };
+    put(0, this.srcTex, a);
+    put(1, this.srcTex2, b);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    this.toCanvas(tw, th);
+    const p = this.transProg;
+    gl.useProgram(p.prog);
+    gl.bindVertexArray(this.vao);
+    gl.uniform1i(p.u.u_a, 0);
+    gl.uniform1i(p.u.u_b, 1);
+    gl.uniform1f(p.u.u_p, progress);
+    gl.uniform1i(p.u.u_kind, kind);
+    gl.uniform1f(p.u.u_aspect, w / Math.max(1, h));
+    gl.uniform1f(p.u.u_flipY, 1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.activeTexture(gl.TEXTURE0);
+    return { image: this.canvas, sx: 0, sy: 0, sw: tw, sh: th };
   }
 }
 

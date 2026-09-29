@@ -2,9 +2,18 @@
  * 사용자 명령 (단축키, 툴바 버튼이 함께 쓴다).
  */
 import { ko } from './i18n/ko';
+import { toast } from './ui/toasts';
 import { clipEnd, createMediaClip, createTextClip, defaultTrackFor, findClip, trackKindFor } from './model/ops';
 import { NEUTRAL_ADJUST, presetFilter } from './model/filters';
-import type { Clip, ColorAdjust, EditState, Ratio, TextStyle } from './model/types';
+import {
+  cutsOf,
+  maxTransitionFrames,
+  TRANSITION_DEFAULT,
+  TRANSITION_MIN,
+  transitionInto,
+  type Cut,
+} from './model/transitions';
+import type { Clip, ColorAdjust, EditState, MediaClip, Ratio, TextStyle, Track, TransitionKind } from './model/types';
 import { history } from './store/history';
 import { useProject } from './store/project';
 import { useUI } from './store/ui';
@@ -27,8 +36,40 @@ export function splitTarget(edit: EditState, selectedId: string | null, frame: n
 
 /** 실행 취소 뒤 선택한 클립이 없어졌으면 선택을 푼다 */
 function fixSelection(): void {
-  const { selectedClipId, select } = useUI.getState();
-  if (selectedClipId && !findClip(useProject.getState().edit, selectedClipId)) select(null);
+  const { selectedClipId, selectedTransition, select, selectTransition } = useUI.getState();
+  const edit = useProject.getState().edit;
+  if (selectedClipId && !findClip(edit, selectedClipId)) select(null);
+  if (selectedTransition) {
+    const loc = findClip(edit, selectedTransition);
+    if (!loc || !transitionInto(loc.track, selectedTransition)) selectTransition(null);
+  }
+}
+
+/** 이 트랙에서 toClipId로 들어가는 경계 */
+function findCut(edit: EditState, trackId: string, toClipId: string): { track: Track; cut: Cut } | null {
+  const track = edit.tracks.find((t) => t.id === trackId);
+  const cut = track ? cutsOf(track).find((c) => c.to.id === toClipId) : undefined;
+  return track && cut ? { track, cut } : null;
+}
+
+/** 트랜지션을 넣을 경계: 고른 클립의 앞 → 뒤 경계, 없으면 플레이헤드에서 가장 가까운 경계 */
+function targetCut(edit: EditState): { track: Track; cut: Cut } | null {
+  const { selectedClipId, selectedTransition, playhead } = useUI.getState();
+  const id = selectedTransition ?? selectedClipId;
+  const loc = id ? findClip(edit, id) : null;
+  if (loc && loc.track.kind === 'video') {
+    const cuts = cutsOf(loc.track);
+    const cut = cuts.find((c) => c.to.id === loc.clip.id) ?? cuts.find((c) => c.from.id === loc.clip.id);
+    if (cut) return { track: loc.track, cut };
+  }
+  let best: { track: Track; cut: Cut } | null = null;
+  for (const track of edit.tracks) {
+    if (track.kind !== 'video') continue;
+    for (const cut of cutsOf(track)) {
+      if (!best || Math.abs(cut.frame - playhead) < Math.abs(best.cut.frame - playhead)) best = { track, cut };
+    }
+  }
+  return best;
 }
 
 export const actions = {
@@ -55,7 +96,11 @@ export const actions = {
     if (useProject.getState().splitClip(target, playhead)) select(target);
   },
   deleteSelected(): void {
-    const { selectedClipId, select } = useUI.getState();
+    const { selectedClipId, selectedTransition, select } = useUI.getState();
+    if (selectedTransition) {
+      actions.removeTransition(selectedTransition);
+      return;
+    }
     if (!selectedClipId) return;
     useProject.getState().deleteClip(selectedClipId);
     select(null);
@@ -96,6 +141,66 @@ export const actions = {
       return { ...c, filter: { ...prev, adjust: { ...prev.adjust, [key]: value } } };
     });
     actions.revealClip(loc.clip.id);
+  },
+  /**
+   * 트랜지션 넣기 (R14). 놓을 경계를 주지 않으면: 고른 클립의 앞 경계(없으면 뒤 경계),
+   * 고른 클립이 없으면 플레이헤드에서 가장 가까운 경계. 이미 있으면 종류만 바꾸고 길이는 그대로 둔다.
+   * 넣은 뒤 그 구간을 한 번 재생해 보여 주고(G1), 트랜지션을 선택해 속성 패널에서 바로 고칠 수 있게 한다.
+   */
+  applyTransition(kind: TransitionKind, at?: { trackId: string; toClipId: string }): boolean {
+    const edit = useProject.getState().edit;
+    const cut = at ? findCut(edit, at.trackId, at.toClipId) : targetCut(edit);
+    if (!cut) {
+      toast('info', ko.effects.noCut);
+      return false;
+    }
+    const max = maxTransitionFrames(cut.track, cut.cut.to.id);
+    if (max < TRANSITION_MIN) {
+      toast('info', ko.effects.tooShort);
+      return false;
+    }
+    const prev = cut.cut.to.transitionIn;
+    const duration = Math.min(max, prev?.duration ?? TRANSITION_DEFAULT);
+    useProject.getState().updateClip(cut.cut.to.id, (c) => ({ ...c, transitionIn: { kind, duration } }) as Clip);
+    useUI.getState().selectTransition(cut.cut.to.id);
+    actions.previewTransition(cut.cut.to.id);
+    return true;
+  },
+  /** 트랜지션 구간을 앞뒤 여유를 두고 한 번 재생한 뒤, 경계(섞인 모습)로 돌아온다 */
+  previewTransition(toClipId: string): void {
+    const loc = findClip(useProject.getState().edit, toClipId);
+    const w = loc ? transitionInto(loc.track, toClipId) : null;
+    if (!w) return;
+    const ui = useUI.getState();
+    const PAD = 10;
+    if (ui.playing) ui.setPlaying(false);
+    ui.setPlayhead(Math.max(0, w.start - PAD));
+    ui.setPlayRange({ end: w.end + PAD, returnTo: w.cut });
+    ui.setPlaying(true);
+  },
+  setTransitionKind(toClipId: string, kind: TransitionKind): void {
+    useProject.getState().updateClip(toClipId, (c) =>
+      c.type !== 'text' && c.transitionIn ? ({ ...c, transitionIn: { ...c.transitionIn, kind } } as Clip) : c,
+    );
+  },
+  /** 길이(프레임). 양쪽 클립 안에 들어가게 줄인다 */
+  setTransitionDuration(toClipId: string, frames: number): void {
+    const loc = findClip(useProject.getState().edit, toClipId);
+    if (!loc) return;
+    const max = maxTransitionFrames(loc.track, toClipId);
+    const d = Math.max(TRANSITION_MIN, Math.min(max, Math.round(frames)));
+    useProject.getState().updateClip(toClipId, (c) =>
+      c.type !== 'text' && c.transitionIn && c.transitionIn.duration !== d ? ({ ...c, transitionIn: { ...c.transitionIn, duration: d } } as Clip) : c,
+    );
+  },
+  removeTransition(toClipId: string): void {
+    useProject.getState().updateClip(toClipId, (c) => {
+      if (c.type === 'text' || !c.transitionIn) return c;
+      const rest: MediaClip = { ...c };
+      delete rest.transitionIn;
+      return rest;
+    });
+    if (useUI.getState().selectedTransition === toClipId) useUI.getState().selectTransition(null);
   },
   /** 텍스트 클립 추가 (R7.1). 첫 텍스트 트랙의 플레이헤드 위치에 넣고 선택한다 */
   addTextClip(style?: TextStyle): string | null {

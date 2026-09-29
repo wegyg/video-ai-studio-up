@@ -60,8 +60,18 @@ export async function decodePaths(blob: Blob, frame: number, opts: { fps?: numbe
     v.muted = true;
     v.src = url;
     await new Promise((res, rej) => ((v.onloadeddata = res), (v.onerror = rej)));
+    // 'seeked' 직후에는 새 프레임이 아직 화면에 올라오지 않았을 수 있다(CPU가 바쁠 때). 올라올 때까지 기다린다
+    const presented = new Promise<void>((res) => {
+      const done = setTimeout(res, 1000);
+      v.requestVideoFrameCallback(() => {
+        clearTimeout(done);
+        res();
+      });
+    });
+    const seeked = new Promise((res) => (v.onseeked = res));
     v.currentTime = t;
-    await new Promise((res) => (v.onseeked = res));
+    await seeked;
+    await presented;
     const a = grab(v);
 
     const wc = await new CanvasSink(track, { poolSize: 1 }).getCanvas(t);

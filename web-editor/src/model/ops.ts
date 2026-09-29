@@ -243,6 +243,8 @@ export function splitClip(edit: EditState, clipId: string, at: number): { edit: 
       fadeIn: 0,
       fadeOut: Math.min(c.fadeOut, rightDur),
     };
+    // 들어오는 트랜지션은 왼쪽 조각에만 남는다 (새로 생긴 자른 자리에는 없다)
+    delete (right as MediaClip).transitionIn;
   } else {
     left = { ...c, duration: leftDur };
     right = { ...c, id: rightId, start: cut, duration: rightDur };

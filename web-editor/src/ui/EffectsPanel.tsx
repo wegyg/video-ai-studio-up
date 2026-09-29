@@ -1,5 +1,5 @@
 /**
- * 좌측 "효과" 탭: 캔버스 배경(단색·흐림 채우기)과 필터 프리셋 12종 + 조정 슬라이더 6종 (R15, R18).
+ * 좌측 "효과" 탭: 캔버스 배경(단색·흐림 채우기), 트랜지션 11종, 필터 프리셋 12종 + 조정 슬라이더 6종 (R14, R15, R18).
  * 필터 목록 썸네일은 선택한 클립의 포스터에 **실제와 같은 WebGL 셰이더**를 적용해 만든다 → 고르기 전에 결과가 보인다 (G1).
  */
 import { useEffect, useRef, useState } from 'react';
@@ -9,10 +9,12 @@ import { ko } from '../i18n/ko';
 import { useMedia } from '../media/store';
 import { ADJUST_KEYS, ADJUST_RANGE, DEFAULT_BACKGROUND, DEFAULT_BLUR_AMOUNT, FILTER_PRESETS, NEUTRAL_ADJUST } from '../model/filters';
 import { findClip } from '../model/ops';
-import type { ColorAdjust, MediaClip } from '../model/types';
+import { TRANSITION_KINDS } from '../model/transitions';
+import type { ColorAdjust, MediaClip, TransitionKind } from '../model/types';
 import { useProject } from '../store/project';
 import { useUI } from '../store/ui';
 import { ColorField, SliderField } from './fields';
+import { TRANSITION_DRAG_TYPE, useTimelineView } from './timeline/view';
 
 function Section({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) {
   return (
@@ -193,6 +195,105 @@ function FilterSection() {
   );
 }
 
+/** 트랜지션 아이콘: 앞 화면(회색)과 새 화면(청록)이 어떻게 바뀌는지 그림으로 */
+function TransitionIcon({ kind }: { kind: TransitionKind }) {
+  const A = '#737373';
+  const B = '#22d3ee';
+  const box = (children: React.ReactNode) => (
+    <svg viewBox="0 0 40 28" className="h-full w-full" aria-hidden="true">
+      <rect x="0" y="0" width="40" height="28" fill={A} />
+      {children}
+    </svg>
+  );
+  switch (kind) {
+    case 'dissolve':
+      return box(<rect x="0" y="0" width="40" height="28" fill={B} opacity="0.5" />);
+    case 'slide-left':
+      return box(<rect x="20" y="0" width="20" height="28" fill={B} />);
+    case 'slide-right':
+      return box(<rect x="0" y="0" width="20" height="28" fill={B} />);
+    case 'slide-up':
+      return box(<rect x="0" y="14" width="40" height="14" fill={B} />);
+    case 'slide-down':
+      return box(<rect x="0" y="0" width="40" height="14" fill={B} />);
+    case 'zoom-in':
+      return box(<rect x="12" y="8" width="16" height="12" fill={B} />);
+    case 'zoom-out':
+      return (
+        <svg viewBox="0 0 40 28" className="h-full w-full" aria-hidden="true">
+          <rect x="0" y="0" width="40" height="28" fill={B} />
+          <rect x="12" y="8" width="16" height="12" fill={A} />
+        </svg>
+      );
+    case 'wipe':
+      return box(<polygon points="0,0 24,0 16,28 0,28" fill={B} />);
+    case 'blur':
+      return box(
+        <>
+          <rect x="0" y="0" width="40" height="28" fill={B} opacity="0.35" />
+          <circle cx="20" cy="14" r="8" fill={B} opacity="0.6" />
+        </>,
+      );
+    case 'shake':
+      return box(<rect x="8" y="4" width="26" height="20" fill={B} transform="rotate(-8 20 14)" />);
+    case 'glitch':
+      return box(
+        <>
+          <rect x="4" y="3" width="36" height="5" fill={B} />
+          <rect x="0" y="11" width="30" height="5" fill={B} />
+          <rect x="8" y="19" width="32" height="5" fill={B} />
+        </>,
+      );
+  }
+}
+
+/** 트랜지션 11종: 누르면 고른 클립(또는 플레이헤드 가까운) 경계에 넣고, 끌면 타임라인 경계에 놓는다 */
+function TransitionSection() {
+  const selected = useUI((s) => s.selectedTransition);
+  const currentKind = useProject((s) => {
+    const c = selected ? findClip(s.edit, selected)?.clip : null;
+    return c && c.type !== 'text' ? (c.transitionIn?.kind ?? null) : null;
+  });
+  return (
+    <Section title={ko.effects.sectionTransition} hint={ko.effects.transitionHint}>
+      <div className="grid grid-cols-3 gap-2" data-testid="transition-presets">
+        {TRANSITION_KINDS.map((k) => {
+          const label = ko.effects.transitions[k] ?? k;
+          const on = currentKind === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              draggable
+              data-testid="transition-preset"
+              data-kind={k}
+              aria-pressed={on}
+              aria-label={label}
+              title={label}
+              onClick={() => actions.applyTransition(k)}
+              onDragStart={(e) => {
+                e.dataTransfer.setData(TRANSITION_DRAG_TYPE, k);
+                e.dataTransfer.effectAllowed = 'copy';
+                useTimelineView.getState().set({ transitionDrag: k });
+              }}
+              onDragEnd={() => useTimelineView.getState().set({ transitionDrag: null })}
+              className={
+                'flex cursor-grab flex-col overflow-hidden rounded-md bg-neutral-800 ring-1 ' +
+                (on ? 'ring-2 ring-cyan-400' : 'ring-neutral-700/60 hover:ring-cyan-500')
+              }
+            >
+              <span className="block aspect-[10/7] w-full overflow-hidden bg-black">
+                <TransitionIcon kind={k} />
+              </span>
+              <span className="truncate px-1 py-0.5 text-center text-[10px] text-neutral-300">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}
+
 export function EffectsPanel() {
   if (!effectsSupported()) {
     return (
@@ -204,6 +305,7 @@ export function EffectsPanel() {
   return (
     <div data-testid="effects-panel">
       <BackgroundSection />
+      <TransitionSection />
       <FilterSection />
     </div>
   );

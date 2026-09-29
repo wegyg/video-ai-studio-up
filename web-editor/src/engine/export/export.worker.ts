@@ -23,12 +23,13 @@ import {
   type InputVideoTrack,
   type WrappedCanvas,
 } from 'mediabunny';
-import { baseSize, clipAt, drawFrame, type FrameSources, type VisualSource } from '../compose';
+import { baseSize, drawFrame, type FrameSources, type VisualSource } from '../compose';
 import { createEffects } from '../gl/effects';
 import { matchPreviewColor } from '../../media/color';
 import { needsEffects } from '../../model/filters';
+import { sourceFrame, visibleRange, visualAt } from '../../model/transitions';
 import { drawTextClip } from '../text';
-import type { Clip, EditState, MediaClip } from '../../model/types';
+import type { EditState, MediaClip, Track } from '../../model/types';
 import type { ExportMessage, ExportRequest } from './protocol';
 
 const port = self as unknown as {
@@ -164,7 +165,8 @@ async function run(req: ExportRequest): Promise<void> {
      * 이 클립의 원본 프레임을 준비한다. 클립마다 따로 디코더를 둔다(같은 원본을 두 트랙에서 동시에 써도 섞이지 않게).
      * 디코딩 크기는 실제로 화면에 그려질 크기로 줄인다 — 4K 원본을 4K로 풀었다가 다시 줄이는 낭비를 없앤다.
      */
-    const readerFor = (clip: MediaClip): ClipReader | null => {
+    const srcFramesOf = (clip: MediaClip) => req.project.assets[clip.assetId]?.durationFrames;
+    const readerFor = (track: Track, clip: MediaClip): ClipReader | null => {
       let r = readers.get(clip.id);
       if (!r) {
         const v = videos.get(clip.assetId);
@@ -176,18 +178,20 @@ async function run(req: ExportRequest): Promise<void> {
           k > 0.95
             ? new CanvasSink(v.track, { poolSize: 2 })
             : new CanvasSink(v.track, { width: even(v.width * k), height: even(v.height * k), fit: 'fill', poolSize: 2 });
-        const startSec = clip.inPoint / fps;
-        const endSec = (clip.inPoint + clip.duration) / fps + 1 / fps;
+        // 트랜지션 구간에서는 원본의 앞뒤 여분까지 읽는다 (미리보기와 같은 sourceFrame 계산, model/transitions.ts)
+        const ext = visibleRange(track, clip);
+        const startSec = sourceFrame(clip, ext.start, srcFramesOf(clip)) / fps;
+        const endSec = (sourceFrame(clip, ext.end - 1, srcFramesOf(clip)) + 1) / fps + 1 / fps;
         r = new ClipReader(sink, startSec, endSec);
         readers.set(clip.id, r);
       }
       return r;
     };
-    /** 끝난 클립의 디코더를 닫아 메모리를 돌려준다 */
+    /** 다 보여 준 클립(트랜지션 구간 포함)의 디코더를 닫아 메모리를 돌려준다 */
     const closeFinished = async (frame: number) => {
       for (const track of edit.tracks) {
         for (const c of track.clips) {
-          if (c.start + c.duration <= frame && readers.has(c.id)) {
+          if (readers.has(c.id) && visibleRange(track, c).end <= frame) {
             await readers.get(c.id)!.close();
             readers.delete(c.id);
           }
@@ -197,27 +201,36 @@ async function run(req: ExportRequest): Promise<void> {
 
     // 프레임마다 필요한 원본 그림을 미리 받아 둔 뒤 그린다 (drawFrame은 동기 함수)
     const pending = new Map<string, VisualSource | null>();
+    const load = async (track: Track, clip: MediaClip, frame: number) => {
+      if (pending.has(clip.id)) return;
+      if (clip.type === 'image') {
+        const b = images.get(clip.assetId);
+        pending.set(clip.id, b ? { image: b, width: b.width, height: b.height } : null);
+        return;
+      }
+      const reader = readerFor(track, clip);
+      if (!reader) {
+        pending.set(clip.id, null);
+        return;
+      }
+      const wrapped = await reader.at(sourceFrame(clip, frame, srcFramesOf(clip)) / fps);
+      const v = videos.get(clip.assetId)!;
+      // 크기는 원본 표시 크기로 넘긴다 → 줄여서 디코딩했어도 배치 계산은 미리보기와 같다
+      pending.set(clip.id, wrapped ? { image: wrapped.canvas, width: v.width, height: v.height } : null);
+    };
     const prepare = async (frame: number) => {
       pending.clear();
       for (const track of edit.tracks) {
         if (track.kind !== 'video') continue;
-        const clip: Clip | undefined = clipAt(track, frame);
-        if (!clip || clip.type === 'text' || clip.type === 'audio') continue;
-        if (clip.type === 'image') {
-          const b = images.get(clip.assetId);
-          pending.set(clip.id, b ? { image: b, width: b.width, height: b.height } : null);
-          continue;
+        const v = visualAt(track, frame);
+        if (!v) continue;
+        if (v.transition) {
+          // 트랜지션 중에는 두 클립이 다 필요하다 (효과를 못 쓰면 drawFrame이 v.clip만 쓴다)
+          await load(track, v.transition.from, frame);
+          await load(track, v.transition.to, frame);
+        } else {
+          await load(track, v.clip, frame);
         }
-        const reader = readerFor(clip);
-        if (!reader) {
-          pending.set(clip.id, null);
-          continue;
-        }
-        const t = (clip.inPoint + (frame - clip.start)) / fps;
-        const wrapped = await reader.at(t);
-        const v = videos.get(clip.assetId)!;
-        // 크기는 원본 표시 크기로 넘긴다 → 줄여서 디코딩했어도 배치 계산은 미리보기와 같다
-        pending.set(clip.id, wrapped ? { image: wrapped.canvas, width: v.width, height: v.height } : null);
       }
     };
 

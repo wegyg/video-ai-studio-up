@@ -4,6 +4,7 @@
  * `adjustPixel`은 WebGL 셰이더(src/engine/gl/effects.ts의 FS_FILTER)와 **같은 계산**을 한다.
  * 셰이더를 고치면 이 함수도 같이 고쳐야 한다. 테스트가 둘의 결과를 비교한다.
  */
+import { transitionsOf } from './transitions';
 import type { CanvasBackground, ClipFilter, ColorAdjust, EditState, MediaClip } from './types';
 
 export const NEUTRAL_ADJUST: ColorAdjust = { brightness: 0, contrast: 0, saturation: 0, temperature: 0, sharpness: 0, vignette: 0 };
@@ -62,7 +63,10 @@ export function presetFilter(id: string): ClipFilter | null {
 /** 이 편집에 WebGL 효과가 필요한지 (필요 없으면 효과 처리기를 만들지 않는다) */
 export function needsEffects(edit: EditState): boolean {
   if (edit.background?.kind === 'blur') return true;
-  for (const t of edit.tracks) for (const c of t.clips) if (c.type !== 'text' && clipAdjust(c)) return true;
+  for (const t of edit.tracks) {
+    if (t.kind === 'video' && transitionsOf(t).length) return true;
+    for (const c of t.clips) if (c.type !== 'text' && clipAdjust(c)) return true;
+  }
   return false;
 }
 

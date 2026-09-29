@@ -107,6 +107,12 @@ export const IconSparkles = (p: P) => (
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
   </Svg>
 );
+/** 트랜지션: 두 장면이 겹치며 바뀜 */
+export const IconTransition = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 6h9v12H4zM11 6h9v12h-9" />
+  </Svg>
+);
 export const IconUpload = (p: P) => (
   <Svg {...p}>
     <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />

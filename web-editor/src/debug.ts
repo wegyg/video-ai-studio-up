@@ -25,7 +25,7 @@ export const debugApi: EditorDebugApi = {
         name: p.name,
         assets: p.assets,
         edit: p.edit,
-        ui: { selectedClipId: u.selectedClipId, playhead: u.playhead, playing: u.playing, pxPerFrame: u.pxPerFrame, snap: u.snap, leftTab: u.leftTab },
+        ui: { selectedClipId: u.selectedClipId, selectedTransition: u.selectedTransition, playhead: u.playhead, playing: u.playing, pxPerFrame: u.pxPerFrame, snap: u.snap, leftTab: u.leftTab },
         history: { past: t.pastStates.length, future: t.futureStates.length },
       }),
     );

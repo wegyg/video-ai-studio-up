@@ -75,11 +75,36 @@ export interface ClipFilter {
  */
 export type CanvasBackground = { kind: 'color'; color: string } | { kind: 'blur'; amount: number };
 
+/** 트랜지션 종류 (R14). 슬라이드는 화면이 움직이는 방향별로 하나씩, 줌은 인·아웃 따로 */
+export type TransitionKind =
+  | 'dissolve'
+  | 'slide-left'
+  | 'slide-right'
+  | 'slide-up'
+  | 'slide-down'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'wipe'
+  | 'blur'
+  | 'shake'
+  | 'glitch';
+
+/**
+ * 바로 앞에 맞닿은 클립에서 이 클립으로 넘어가는 트랜지션 (R14). 길이는 프레임.
+ * 경계를 가운데 두고 앞뒤로 절반씩 걸친다 — 계산은 model/transitions.ts
+ */
+export interface Transition {
+  kind: TransitionKind;
+  duration: number;
+}
+
 export interface MediaClip extends ClipBase {
   type: 'video' | 'image' | 'audio';
   assetId: string;
   /** 필터·조정 (영상·이미지만). 없으면 원본 그대로 — 예전에 저장한 프로젝트에는 이 값이 없다 */
   filter?: ClipFilter;
+  /** 앞 클립에서 넘어오는 트랜지션 (영상·이미지만). 없으면 바로 바뀐다 */
+  transitionIn?: Transition;
   /** 원본에서의 시작 프레임 (이미지는 항상 0) */
   inPoint: number;
   /** 1 = 100% (0~2) */

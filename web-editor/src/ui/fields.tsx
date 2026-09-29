@@ -22,6 +22,8 @@ interface Common {
   onCommit: (v: number) => void;
   testId?: string;
   disabled?: boolean;
+  /** 표시값 소수 자리 (없으면 정수로 반올림해 보여 준다) */
+  digits?: number;
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
@@ -72,7 +74,7 @@ export function NumberField(props: Common) {
 }
 
 export function SliderField(props: Common) {
-  const { label, value, min, max, step = 1, unit, toView = (v) => v, fromView = (v) => v, onCommit, testId, disabled } = props;
+  const { label, value, min, max, step = 1, unit, toView = (v) => v, fromView = (v) => v, onCommit, testId, disabled, digits } = props;
   const view = toView(value);
   return (
     <label className="flex items-center gap-2 text-xs">
@@ -94,7 +96,7 @@ export function SliderField(props: Common) {
         className="min-w-0 flex-1 accent-cyan-400 disabled:opacity-40"
       />
       <span className="w-10 shrink-0 text-right tabular-nums text-neutral-300">
-        {Math.round(view)}
+        {digits ? view.toFixed(digits) : Math.round(view)}
         {unit}
       </span>
     </label>

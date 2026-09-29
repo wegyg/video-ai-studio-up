@@ -1,9 +1,11 @@
 /**
  * 한 프레임 합성 (R6.1, R11.8). 미리보기와 내보내기가 **같은 함수**를 쓴다.
  * 좌표는 프로젝트 해상도(예: 1080×1920) 기준이다. 호출하는 쪽에서 캔버스 배율(setTransform)을 정한다.
- * 순서: 배경(단색 또는 흐림) → 영상 트랙 아래→위 (필터는 WebGL 셰이더) → 텍스트 트랙(항상 맨 앞).
+ * 순서: 배경(단색 또는 흐림) → 영상 트랙 아래→위 (필터·트랜지션은 WebGL 셰이더) → 텍스트 트랙(항상 맨 앞).
+ * 트랜지션 구간에서는 두 클립을 각자 배치·필터까지 그린 장면 두 장을 만든 뒤 셰이더로 섞는다.
  */
 import { clipAdjust, DEFAULT_BACKGROUND } from '../model/filters';
+import { TRANSITION_KINDS, visualAt } from '../model/transitions';
 import { RATIO_SIZE, type ColorAdjust, type Clip, type EditState, type MediaClip, type TextClip, type Track, type Transform } from '../model/types';
 
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -35,6 +37,8 @@ export interface Effects {
   filter(image: CanvasImageSource, adjust: ColorAdjust, outW: number, outH: number, pxScale: number): EffectImage | null;
   /** 흐림 배경: image를 W×H에 꽉 차게 깔고 흐리게 한 그림 */
   blurFill(image: CanvasImageSource, adjust: ColorAdjust | null, W: number, H: number, amount: number): EffectImage | null;
+  /** 트랜지션: 같은 크기(w×h)의 두 장면을 섞는다. kind = TRANSITION_KINDS 번호, progress 0~1 */
+  transition(a: CanvasImageSource, b: CanvasImageSource, kind: number, progress: number, w: number, h: number): EffectImage | null;
 }
 
 export interface FrameSources {
@@ -88,6 +92,40 @@ function coversCanvas(clip: MediaClip, src: VisualSource, W: number, H: number):
   return cx - hw <= 0.5 && cx + hw >= W - 0.5 && cy - hh <= 0.5 && cy + hh >= H - 0.5;
 }
 
+interface Part {
+  clip: MediaClip;
+  src: VisualSource;
+}
+/** 영상 트랙 하나가 이 프레임에 그릴 것: 클립 하나, 또는 트랜지션 중인 두 클립 */
+type Layer = { one: Part } | { from: Part | null; to: Part | null; kind: number; progress: number };
+
+/** 트랜지션 장면용 캔버스 (미리보기·내보내기 Worker 각자 한 벌) */
+const sceneCache: { canvas: OffscreenCanvas; ctx: OffscreenCanvasRenderingContext2D }[] = [];
+function scene(i: number, w: number, h: number): { canvas: OffscreenCanvas; ctx: OffscreenCanvasRenderingContext2D } {
+  let s = sceneCache[i];
+  if (!s) {
+    const canvas = new OffscreenCanvas(w, h);
+    s = sceneCache[i] = { canvas, ctx: canvas.getContext('2d')! };
+  } else if (s.canvas.width !== w || s.canvas.height !== h) {
+    s.canvas.width = w;
+    s.canvas.height = h;
+  }
+  return s;
+}
+
+/** 클립 하나를 배치대로 그린다 (필터가 있으면 셰이더를 거쳐서) */
+function drawPart(ctx: Ctx2D, part: Part, W: number, H: number, fx: Effects | null, pxScale: number): void {
+  const { clip, src } = part;
+  let s = src;
+  const adjust = fx ? clipAdjust(clip) : null;
+  if (adjust && fx) {
+    const { w, h } = baseSize(src.width, src.height, W, H);
+    const out = fx.filter(src.image, adjust, w * clip.transform.scale * pxScale, h * clip.transform.scale * pxScale, pxScale);
+    if (out) s = { ...src, image: out.image, sx: out.sx, sy: out.sy, sw: out.sw, sh: out.sh };
+  }
+  drawVisual(ctx, s, clip.transform, W, H);
+}
+
 export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: FrameSources): void {
   const { width: W, height: H } = RATIO_SIZE[edit.ratio];
   const fx = sources.effects ?? null;
@@ -97,32 +135,68 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
   ctx.fillStyle = bg.kind === 'color' ? bg.color : '#000000';
   ctx.fillRect(0, 0, W, H);
 
-  // 영상 층: 아래 트랙부터 위로
-  const layers: { clip: MediaClip; src: VisualSource }[] = [];
+  // 영상 층: 아래 트랙부터 위로. 효과를 쓸 수 없으면 트랜지션 없이 경계에서 바로 바뀐다
+  const layers: Layer[] = [];
   const video = edit.tracks.filter((t) => t.kind === 'video');
   for (let i = video.length - 1; i >= 0; i--) {
-    const c = clipAt(video[i], frame);
-    if (!c || c.type === 'text' || c.type === 'audio') continue;
-    const src = sources.visual(c, frame);
-    if (src) layers.push({ clip: c, src });
-  }
-
-  // 흐림 배경: 맨 아래 층을 화면에 꽉 차게 흐리게 깐다 (그 층이 화면을 다 덮으면 생략)
-  if (bg.kind === 'blur' && fx && layers.length && !coversCanvas(layers[0].clip, layers[0].src, W, H)) {
-    const base = layers[0];
-    const out = fx.blurFill(base.src.image, clipAdjust(base.clip), W, H, bg.amount);
-    if (out) ctx.drawImage(out.image, out.sx, out.sy, out.sw, out.sh, 0, 0, W, H);
-  }
-
-  for (const { clip, src } of layers) {
-    let s = src;
-    const adjust = fx ? clipAdjust(clip) : null;
-    if (adjust && fx) {
-      const { w, h } = baseSize(src.width, src.height, W, H);
-      const out = fx.filter(src.image, adjust, w * clip.transform.scale * pxScale, h * clip.transform.scale * pxScale, pxScale);
-      if (out) s = { ...src, image: out.image, sx: out.sx, sy: out.sy, sw: out.sw, sh: out.sh };
+    const v = visualAt(video[i], frame);
+    if (!v) continue;
+    if (v.transition && fx) {
+      const a = sources.visual(v.transition.from, frame);
+      const b = sources.visual(v.transition.to, frame);
+      if (!a && !b) continue;
+      layers.push({
+        from: a ? { clip: v.transition.from, src: a } : null,
+        to: b ? { clip: v.transition.to, src: b } : null,
+        kind: TRANSITION_KINDS.indexOf(v.transition.kind),
+        progress: v.progress,
+      });
+    } else {
+      const src = sources.visual(v.clip, frame);
+      if (src) layers.push({ one: { clip: v.clip, src } });
     }
-    drawVisual(ctx, s, clip.transform, W, H);
+  }
+
+  // 흐림 배경: 맨 아래 층을 화면에 꽉 차게 흐리게 깐다 (그 층이 화면을 다 덮으면 생략).
+  // 맨 아래 층이 트랜지션 중이면 두 클립의 흐린 배경을 진행도만큼 섞는다
+  if (bg.kind === 'blur' && fx && layers.length) {
+    const base = layers[0];
+    const parts: [Part, number][] = 'one' in base ? [[base.one, 1]] : [];
+    if (!('one' in base)) {
+      if (base.from) parts.push([base.from, 1]);
+      if (base.to) parts.push([base.to, base.from ? base.progress : 1]);
+    }
+    if (!parts.every(([pt]) => coversCanvas(pt.clip, pt.src, W, H))) {
+      for (const [pt, alpha] of parts) {
+        const out = fx.blurFill(pt.src.image, clipAdjust(pt.clip), W, H, bg.amount);
+        if (!out) continue;
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(out.image, out.sx, out.sy, out.sw, out.sh, 0, 0, W, H);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  for (const layer of layers) {
+    if ('one' in layer) {
+      drawPart(ctx, layer.one, W, H, fx, pxScale);
+      continue;
+    }
+    // 트랜지션: 두 클립을 각자 장면으로 그린 뒤 셰이더로 섞는다 (장면 = 이 층만, 투명 배경)
+    const lw = Math.max(1, Math.round(W * pxScale));
+    const lh = Math.max(1, Math.round(H * pxScale));
+    const paint = (i: number, part: Part | null) => {
+      const sc = scene(i, lw, lh);
+      sc.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      sc.ctx.clearRect(0, 0, lw, lh);
+      sc.ctx.setTransform(lw / W, 0, 0, lh / H, 0, 0);
+      if (part) drawPart(sc.ctx, part, W, H, fx, pxScale);
+      return sc.canvas;
+    };
+    const a = paint(0, layer.from);
+    const b = paint(1, layer.to);
+    const out = fx!.transition(a, b, layer.kind, layer.progress, lw, lh);
+    if (out) ctx.drawImage(out.image, out.sx, out.sy, out.sw, out.sh, 0, 0, W, H);
   }
 
   if (sources.text) {

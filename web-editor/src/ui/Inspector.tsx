@@ -9,6 +9,7 @@ import { FPS, type Clip, type MediaClip, type Transform } from '../model/types';
 import { useProject } from '../store/project';
 import { useUI } from '../store/ui';
 import { NumberField, SliderField } from './fields';
+import { TransitionProps } from './TransitionProps';
 import { TextProps } from './TextProps';
 
 const FADE_MAX = 5 * FPS;
@@ -156,12 +157,15 @@ export function Inspector() {
   const clip = useSelectedClip();
   const trackKind = useSelectedTrackKind();
   const playhead = useUI((s) => s.playhead);
+  const selectedTransition = useUI((s) => s.selectedTransition);
   const visible = clip ? playhead >= clip.start && playhead < clip.start + clip.duration : false;
 
   return (
     <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-neutral-800 bg-neutral-900" data-testid="inspector">
       <h2 className="border-b border-neutral-800 px-3 py-2.5 text-sm font-bold">{ko.inspector.title}</h2>
-      {!clip ? (
+      {selectedTransition ? (
+        <TransitionProps toClipId={selectedTransition} />
+      ) : !clip ? (
         <p className="px-4 py-6 text-center text-sm leading-relaxed text-neutral-400">{ko.inspector.empty}</p>
       ) : (
         <>

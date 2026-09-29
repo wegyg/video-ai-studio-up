@@ -4,7 +4,8 @@ import { ko, withKey } from '../../i18n/ko';
 import { trackKindFor } from '../../model/ops';
 import { snapCandidates, snapValue, SNAP_THRESHOLD_PX } from '../../model/snap';
 import { editDuration } from '../../model/time';
-import type { Track } from '../../model/types';
+import { cutsOf, nearestCut, transitionsOf } from '../../model/transitions';
+import type { Track, TransitionKind } from '../../model/types';
 import { useProject } from '../../store/project';
 import { clampZoom, useUI } from '../../store/ui';
 import { IconButton } from '../common';
@@ -14,6 +15,7 @@ import {
   IconMusic,
   IconPlus,
   IconScissors,
+  IconTransition,
   IconTrash,
   IconType,
   IconVolume,
@@ -25,7 +27,7 @@ import { ASSET_DRAG_TYPE } from '../MediaPanel';
 import { ClipView } from './ClipView';
 import { HEADER_W, ROW_H, RULER_H, SLIDER_MAX, TAIL_FRAMES, sliderToZoom, zoomToSlider } from './layout';
 import { Ruler } from './Ruler';
-import { assetDrag, useTimelineView } from './view';
+import { assetDrag, TRANSITION_DRAG_TYPE, useTimelineView } from './view';
 
 function Toolbar() {
   const snap = useUI((s) => s.snap);
@@ -113,15 +115,98 @@ function acceptsDraggedAsset(track: Track, id: string | null): boolean {
   return !!asset && trackKindFor(asset.kind) === track.kind;
 }
 
+/** 트랜지션을 놓을 수 있는 거리 (화면 px) */
+const TRANSITION_DROP_PX = 28;
+
+/** 트랜지션 표시(경계 위 작은 막대)와, 트랜지션을 끄는 동안 놓을 수 있는 경계 표시 */
+function TransitionMarks({ track, dropCut }: { track: Track; dropCut: string | null }) {
+  const ppf = useUI((s) => s.pxPerFrame);
+  const selected = useUI((s) => s.selectedTransition);
+  const dragging = useTimelineView((s) => s.transitionDrag);
+  const wins = transitionsOf(track);
+  const targets = dragging ? cutsOf(track) : [];
+  return (
+    <>
+      {wins.map((w) => {
+        const real = w.duration * ppf;
+        const width = Math.max(14, real);
+        const left = width > real ? w.cut * ppf - width / 2 : w.start * ppf;
+        const label = ko.timeline.transition(ko.effects.transitions[w.kind] ?? w.kind);
+        return (
+          <button
+            key={w.to.id}
+            type="button"
+            data-testid="transition"
+            data-to-clip-id={w.to.id}
+            data-kind={w.kind}
+            data-selected={selected === w.to.id}
+            aria-label={label}
+            title={label}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              useUI.getState().selectTransition(w.to.id);
+            }}
+            className={
+              'absolute top-1/2 z-[6] flex h-5 -translate-y-1/2 items-center justify-center rounded text-white shadow ' +
+              (selected === w.to.id ? 'bg-cyan-400 ring-2 ring-white' : 'bg-cyan-600/90 hover:bg-cyan-500')
+            }
+            style={{ left, width }}
+          >
+            <IconTransition />
+          </button>
+        );
+      })}
+      {targets.map((c) => (
+        <div
+          key={c.to.id}
+          data-testid="cut-target"
+          data-to-clip-id={c.to.id}
+          aria-hidden="true"
+          className={
+            'pointer-events-none absolute inset-y-1 z-[6] w-3 -translate-x-1/2 rounded ' +
+            (dropCut === c.to.id ? 'bg-cyan-300 ring-2 ring-white' : 'bg-cyan-400/50')
+          }
+          style={{ left: c.frame * ppf }}
+        />
+      ))}
+    </>
+  );
+}
+
 function TrackLane({ track, width, scroller }: { track: Track; width: number; scroller: HTMLDivElement | null }) {
   const [dropping, setDropping] = useState(false);
+  const [dropCut, setDropCut] = useState<string | null>(null);
+  /** 끄는 중인 트랜지션을 놓을 경계 (포인터에서 가까운 것) */
+  const cutUnder = (e: DragEvent) => {
+    const z = useUI.getState().pxPerFrame;
+    const frame = (e.clientX - e.currentTarget.getBoundingClientRect().left) / z;
+    return nearestCut(track, frame, TRANSITION_DROP_PX / z);
+  };
   const onDragOver = (e: DragEvent) => {
+    if (useTimelineView.getState().transitionDrag) {
+      const cut = track.kind === 'video' ? cutUnder(e) : null;
+      setDropCut(cut?.to.id ?? null);
+      if (!cut) return; // 경계 근처가 아니면 놓을 수 없음
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      return;
+    }
     if (!acceptsDraggedAsset(track, assetDrag.id)) return; // 기본 동작을 막지 않으면 "놓을 수 없음" 커서
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     setDropping(true);
   };
   const onDrop = (e: DragEvent) => {
+    const kind = useTimelineView.getState().transitionDrag ?? ((e.dataTransfer.getData(TRANSITION_DRAG_TYPE) || null) as TransitionKind | null);
+    if (kind) {
+      const cut = track.kind === 'video' ? cutUnder(e) : null;
+      setDropCut(null);
+      useTimelineView.getState().set({ transitionDrag: null });
+      if (!cut) return;
+      e.preventDefault();
+      actions.applyTransition(kind, { trackId: track.id, toClipId: cut.to.id });
+      return;
+    }
     const id = assetDrag.id ?? e.dataTransfer.getData(ASSET_DRAG_TYPE);
     setDropping(false);
     if (!acceptsDraggedAsset(track, id)) return;
@@ -140,7 +225,10 @@ function TrackLane({ track, width, scroller }: { track: Track; width: number; sc
       className={'relative shrink-0 border-b border-neutral-800 ' + (dropping ? 'bg-cyan-500/10' : 'bg-neutral-950/60')}
       style={{ width, height: ROW_H[track.kind] }}
       onDragOver={onDragOver}
-      onDragLeave={() => setDropping(false)}
+      onDragLeave={() => {
+        setDropping(false);
+        setDropCut(null);
+      }}
       onDrop={onDrop}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) useUI.getState().select(null);
@@ -149,6 +237,7 @@ function TrackLane({ track, width, scroller }: { track: Track; width: number; sc
       {track.clips.map((c) => (
         <ClipView key={c.id} clip={c} rowKind={track.kind} scroller={scroller} />
       ))}
+      {track.kind === 'video' && <TransitionMarks track={track} dropCut={dropCut} />}
     </div>
   );
 }

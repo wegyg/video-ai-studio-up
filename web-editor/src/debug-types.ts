@@ -53,7 +53,8 @@ export interface DebugState {
         shadow?: { enabled: boolean; color: string; blur: number; offsetX: number; offsetY: number };
         animIn?: { type: string; duration: number };
         animOut?: { type: string; duration: number };
-        // 필터 (2단계)
+        // 트랜지션·필터 (2단계)
+        transitionIn?: { kind: string; duration: number };
         filter?: {
           preset: string | null;
           adjust: { brightness: number; contrast: number; saturation: number; temperature: number; sharpness: number; vignette: number };
@@ -62,7 +63,7 @@ export interface DebugState {
     }[];
     background?: { kind: 'color'; color: string } | { kind: 'blur'; amount: number };
   };
-  ui: { selectedClipId: string | null; playhead: number; playing: boolean; pxPerFrame: number; snap: boolean; leftTab: string };
+  ui: { selectedClipId: string | null; selectedTransition: string | null; playhead: number; playing: boolean; pxPerFrame: number; snap: boolean; leftTab: string };
   history: { past: number; future: number };
 }
 
