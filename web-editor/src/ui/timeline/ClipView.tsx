@@ -21,18 +21,23 @@ const TYPE_STYLE: Record<Clip['type'], string> = {
   text: 'bg-amber-900/80 ring-amber-500/70',
 };
 
+/** 필름스트립: 높이 h에 맞춰 썸네일 비율을 유지하며 이어 그린다 */
 function drawFilmstrip(ctx: CanvasRenderingContext2D, f: Filmstrip, clip: MediaClip, ppf: number, visL: number, w: number, h: number) {
-  const first = Math.floor(visL / f.thumbW);
-  const last = Math.ceil((visL + w) / f.thumbW);
+  const tileW = (f.thumbW * h) / f.thumbH;
+  const first = Math.floor(visL / tileW);
+  const last = Math.ceil((visL + w) / tileW);
   for (let k = first; k < last; k++) {
-    const localX = k * f.thumbW;
+    const localX = k * tileW;
     const srcSec = (clip.inPoint + localX / ppf) / FPS;
     const idx = Math.min(f.count - 1, Math.max(0, Math.floor(srcSec / f.interval)));
     const sx = (idx % f.cols) * f.thumbW;
     const sy = Math.floor(idx / f.cols) * f.thumbH;
-    ctx.drawImage(f.bitmap, sx, sy, f.thumbW, f.thumbH, localX - visL, 0, f.thumbW, h);
+    ctx.drawImage(f.bitmap, sx, sy, f.thumbW, f.thumbH, localX - visL, 0, tileW, h);
   }
 }
+
+/** 소리가 있는 영상 클립의 아래쪽 파형 띠 높이 비율 (R4.3) */
+const VIDEO_WAVE_RATIO = 0.3;
 
 /** 보이는 부분만 그리는 캔버스 (영상: 필름스트립, 오디오: 파형) */
 function ClipCanvas({ clip, width, height }: { clip: MediaClip; width: number; height: number }) {
@@ -55,12 +60,20 @@ function ClipCanvas({ clip, width, height }: { clip: MediaClip; width: number; h
     const ctx = c.getContext('2d')!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, height);
-    if (clip.type === 'video' && entry?.filmstrip) drawFilmstrip(ctx, entry.filmstrip, clip, ppf, visL, w, height);
-    if (clip.type === 'audio' && entry?.peaks) {
-      const s = (clip.inPoint + visL / ppf) / FPS;
-      const e = (clip.inPoint + (visL + w) / ppf) / FPS;
-      drawPeaks(ctx, entry.peaks, s, Math.min(e, entry.peaks.length / PEAKS_PER_SEC + 1), 0, 4, w, height - 8, '#7dd3fc');
+    const peaks = entry?.peaks;
+    const s = (clip.inPoint + visL / ppf) / FPS;
+    const e = peaks ? Math.min((clip.inPoint + (visL + w) / ppf) / FPS, peaks.length / PEAKS_PER_SEC + 1) : 0;
+    if (clip.type === 'video') {
+      // 소리가 있는 영상: 위 = 필름스트립, 아래 띠 = 파형 (R4.3)
+      const waveH = peaks ? Math.round(height * VIDEO_WAVE_RATIO) : 0;
+      if (entry?.filmstrip) drawFilmstrip(ctx, entry.filmstrip, clip, ppf, visL, w, height - waveH);
+      if (peaks) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, height - waveH, w, waveH);
+        drawPeaks(ctx, peaks, s, e, 0, height - waveH + 1, w, waveH - 2, '#5eead4');
+      }
     }
+    if (clip.type === 'audio' && peaks) drawPeaks(ctx, peaks, s, e, 0, 4, w, height - 8, '#7dd3fc');
   }, [clip, entry?.filmstrip, entry?.peaks, ppf, visL, w, height]);
 
   if (w <= 0) return null;

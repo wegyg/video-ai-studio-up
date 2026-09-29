@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import '../../src/debug-types';
 import type { DebugState } from '../../src/debug-types';
 import { fixture } from './fixtures';
+import { colorName } from './helpers';
 
 type ClipData = DebugState['edit']['tracks'][number]['clips'][number];
 
@@ -55,7 +56,18 @@ test('미디어를 트랙으로 끌어 넣기 — 종류가 다른 트랙에는 
   // x=6px → 3프레임 → 스냅(0에서 4프레임 이내)으로 0
   await tile(page, 'color-steps.mp4').dragTo(mainLane(page), { targetPosition: { x: 6, y: 30 } });
   expect((await clipsOf(page, 'video')).map((c) => [c.type, c.start, c.duration])).toEqual([['video', 0, 120]]);
-  await expect(page.locator('[data-testid=clip][data-type=video] canvas')).toHaveCount(1); // 필름스트립
+  const canvas = page.locator('[data-testid=clip][data-type=video] canvas');
+  await expect(canvas).toHaveCount(1);
+  // 소리가 있는 영상 클립: 위쪽은 필름스트립(첫 장 = 빨강), 아래 띠는 파형 (R4.3)
+  const px = await canvas.evaluate((c: HTMLCanvasElement) => {
+    const ctx = c.getContext('2d')!;
+    const at = (x: number, y: number) => [...ctx.getImageData(x, y, 1, 1).data.slice(0, 3)];
+    return { film: at(10, Math.floor(c.height * 0.3)), wave: at(Math.floor(c.width / 2), c.height - Math.round(c.height * 0.15)) };
+  });
+  expect(colorName(px.film), '필름스트립').toBe('빨강');
+  // 파형 색 #5eead4 = (94, 234, 212)
+  const [r, g, b] = px.wave;
+  expect(Math.abs(r - 94) + Math.abs(g - 234) + Math.abs(b - 212), `파형 픽셀 ${px.wave}`).toBeLessThan(30);
 
   // 오디오를 영상 트랙에, 이미지를 텍스트 트랙에 → 거부
   await tile(page, 'audio.wav').dragTo(mainLane(page), { targetPosition: { x: 400, y: 30 } });

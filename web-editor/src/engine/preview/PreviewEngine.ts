@@ -270,9 +270,13 @@ export class PreviewEngine {
   }
 
   private routeAudio(s: Slot): void {
-    if (!this.audio || s.audio) return;
-    if (!useProject.getState().assets[s.clip.assetId]?.hasAudio) return;
-    s.audio = this.audio.route(s.el);
+    if (s.audio) return;
+    if (!useProject.getState().assets[s.clip.assetId]?.hasAudio) {
+      // 소리를 읽지 못한(또는 소리가 없는) 파일: 볼륨/음소거를 거치지 않는 소리가 나지 않게 요소를 음소거
+      s.el.muted = true;
+      return;
+    }
+    if (this.audio) s.audio = this.audio.route(s.el);
   }
 
   private loop = (): void => {

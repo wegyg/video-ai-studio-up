@@ -15,7 +15,8 @@ export default defineConfig({
     // BASE_URL을 주면 배포된 사이트를 대상으로 같은 테스트를 돌린다 (예: GitHub Pages 주소)
     baseURL: process.env.BASE_URL ?? 'http://localhost:4173/',
     viewport: { width: 1536, height: 864 }, // Windows 노트북 1920x1080 @125% 배율과 같은 크기
-    launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] },
+    // 자동 재생 허용 플래그를 쓰지 않는다: 사용자 Chrome과 같은 기본 정책에서 재생·소리를 검증한다
+    // (테스트의 키 입력/클릭은 실제 사용자 입력으로 취급되어 재생 권한을 준다)
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
