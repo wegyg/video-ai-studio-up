@@ -5,6 +5,7 @@
 import { fontUrl } from '../../fonts';
 import { sourceBlobs } from '../../media/store';
 import { editDuration } from '../../model/time';
+import { isMedia } from '../../model/ops';
 import { FPS, RATIO_SIZE, type EditState, type TextFont, type TextWeight } from '../../model/types';
 import { useProject } from '../../store/project';
 import { mixExportAudio } from './audio-mix';
@@ -120,7 +121,7 @@ export class ExportJob {
     const blobs: Record<string, Blob> = {};
     for (const t of edit.tracks) {
       for (const c of t.clips) {
-        if (c.type === 'text') continue;
+        if (!isMedia(c)) continue;
         const blob = sourceBlobs.get(c.assetId);
         if (blob) blobs[c.assetId] = blob;
       }

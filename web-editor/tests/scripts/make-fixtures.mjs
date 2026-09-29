@@ -64,6 +64,12 @@ run('color-matrix-only-sd.mp4', [
   '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-x264-params', 'colormatrix=bt709',
 ]);
 
+// 2-3) 투명 PNG 로고 (200x200): 가운데 100x100만 불투명 자홍, 나머지는 완전 투명 (오버레이 테스트용)
+run('logo.png', [
+  '-f', 'lavfi', '-i', 'color=c=black@0.0:s=200x200,format=rgba,drawbox=x=50:y=50:w=100:h=100:color=0xFF00FF@1.0:t=fill:replace=1',
+  '-frames:v', '1',
+]);
+
 // 3) 이미지: PNG 400x400 청록, JPG 600x400 주황.
 run('image.png', ['-f', 'lavfi', '-i', 'color=c=0x00FFFF:s=400x400', '-frames:v', '1']);
 run('image.jpg', ['-f', 'lavfi', '-i', 'color=c=0xFF8800:s=600x400', '-frames:v', '1', '-q:v', '3']);

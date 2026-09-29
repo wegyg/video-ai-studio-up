@@ -28,6 +28,7 @@ export const ko = {
     text: '텍스트',
     audio: '오디오',
     effects: '효과',
+    elements: '요소',
   },
   common: {
     close: '닫기',
@@ -41,6 +42,7 @@ export const ko = {
     preparing: '준비 중',
     kind: { video: '영상', image: '이미지', audio: '오디오' },
     addToTimeline: '타임라인에 추가 (플레이헤드 위치)',
+    addOverlay: '위에 얹기 (로고 · 화면 속 화면)',
     remove: (name: string) => `${name} 목록에서 지우기 (이 미디어를 쓰는 클립도 지워집니다)`,
   },
   importErrors: {
@@ -244,7 +246,7 @@ export const ko = {
   inspector: {
     title: '속성',
     empty: '타임라인에서 클립을 선택하면 속성이 여기에 표시됩니다.',
-    kind: { video: '영상 클립', image: '이미지 클립', audio: '오디오 클립', text: '텍스트 클립' },
+    kind: { video: '영상 클립', image: '이미지 클립', audio: '오디오 클립', text: '텍스트 클립', shape: '도형 클립' },
     offscreen: '선택한 클립이 현재 시간에 없습니다.',
     goToClip: '클립 시작으로 이동',
     sectionTransform: '화면 배치',
@@ -264,6 +266,15 @@ export const ko = {
     resetTransform: '화면 배치 초기화',
     noAudio: '이 클립에는 소리가 없습니다.',
     units: { percent: '%', degree: '°', second: '초', times: '배' },
+    shape: {
+      title: '도형',
+      kind: '모양',
+      fill: '채우기',
+      width: '가로',
+      height: '세로',
+      strokeWidth: '테두리',
+      strokeColor: '테두리 색',
+    },
     keyframe: {
       toggle: (label: string) => `${label} 키프레임 넣기/빼기`,
       position: '위치',
@@ -304,6 +315,20 @@ export const ko = {
     dropTransition: '여기에 놓기',
     keyframe: '키프레임 (끌어서 옮기기)',
   },
+  elements: {
+    shapes: '도형',
+    shapesHint: '누르면 위 영상 트랙의 지금 위치에 들어갑니다. 색·크기는 오른쪽 속성 패널에서 바꿉니다.',
+    overlay: '로고 · 화면 속 화면',
+    overlayHint: '사진(투명 PNG 로고)이나 영상을 위 트랙에 작게 얹습니다. 위치·크기는 미리보기에서 끌어 바꾸세요.',
+    addOverlay: (name: string) => `${name} 위에 얹기`,
+    empty: '먼저 미디어 탭에서 사진이나 영상을 가져오세요.',
+  },
+  shapes: {
+    rect: '사각형',
+    rounded: '둥근 사각형',
+    circle: '원',
+    triangle: '삼각형',
+  } as Record<string, string>,
   tracks: {
     text: '텍스트',
     video: (n: number) => `영상 ${n}`,

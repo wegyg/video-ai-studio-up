@@ -203,7 +203,25 @@ export interface TextClip extends ClipBase, TextStyle {
   transform: Transform;
 }
 
-export type Clip = MediaClip | TextClip;
+/** 도형 종류 (R18 오버레이) */
+export type ShapeKind = 'rect' | 'rounded' | 'circle' | 'triangle';
+
+/** 도형 클립: 영상 트랙 위에 그리는 단색 도형. 배치·키프레임은 다른 화면 클립과 같다 */
+export interface ShapeClip extends ClipBase {
+  type: 'shape';
+  shape: ShapeKind;
+  /** 크기 100%일 때 가로·세로 (프로젝트 픽셀) */
+  width: number;
+  height: number;
+  /** 채우기 색 #rrggbb */
+  fill: string;
+  /** 테두리 두께 (프로젝트 픽셀, 0 = 없음)와 색 */
+  strokeWidth: number;
+  strokeColor: string;
+  transform: Transform;
+}
+
+export type Clip = MediaClip | TextClip | ShapeClip;
 
 export interface Track {
   id: string;

@@ -547,6 +547,7 @@ export class PreviewEngine {
     const c = loc.clip;
     if (frame < c.start || frame >= c.start + c.duration) return null;
     const { width: W, height: H } = RATIO_SIZE[edit.ratio];
+    if (c.type === 'shape') return textBox(c.width, c.height, transformAt(c, frame), W, H); // 도형은 자기 크기 그대로
     if (c.type === 'text') {
       // 텍스트는 글자 배치 결과가 곧 크기다 (맞춤 계산을 하지 않는다)
       const l = layoutText(c, W, H);

@@ -8,7 +8,7 @@ import { effectsSupported, sharedEffects } from '../engine/gl/effects';
 import { ko } from '../i18n/ko';
 import { useMedia } from '../media/store';
 import { ADJUST_KEYS, ADJUST_RANGE, DEFAULT_BACKGROUND, DEFAULT_BLUR_AMOUNT, FILTER_PRESETS, NEUTRAL_ADJUST } from '../model/filters';
-import { findClip } from '../model/ops';
+import { findClip, isMedia } from '../model/ops';
 import { TRANSITION_KINDS } from '../model/transitions';
 import type { ColorAdjust, MediaClip, TransitionKind } from '../model/types';
 import { useProject } from '../store/project';
@@ -252,7 +252,7 @@ function TransitionSection() {
   const selected = useUI((s) => s.selectedTransition);
   const currentKind = useProject((s) => {
     const c = selected ? findClip(s.edit, selected)?.clip : null;
-    return c && c.type !== 'text' ? (c.transitionIn?.kind ?? null) : null;
+    return c && isMedia(c) ? (c.transitionIn?.kind ?? null) : null;
   });
   return (
     <Section title={ko.effects.sectionTransition} hint={ko.effects.transitionHint}>

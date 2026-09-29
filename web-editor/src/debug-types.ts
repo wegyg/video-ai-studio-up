@@ -55,6 +55,13 @@ export interface DebugState {
         animIn?: { type: string; duration: number };
         animOut?: { type: string; duration: number };
         keyframes?: Record<string, { f: number; v: number; ease: string }[]>;
+        // 도형 클립
+        shape?: string;
+        width?: number;
+        height?: number;
+        fill?: string;
+        strokeWidth?: number;
+        strokeColor?: string;
         // 트랜지션·필터 (2단계)
         transitionIn?: { kind: string; duration: number };
         filter?: {

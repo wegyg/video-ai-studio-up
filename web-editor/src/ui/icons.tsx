@@ -113,6 +113,20 @@ export const IconTransition = (p: P) => (
     <path d="M4 6h9v12H4zM11 6h9v12h-9" />
   </Svg>
 );
+/** 요소(도형): 네모와 동그라미 */
+export const IconShapes = (p: P) => (
+  <Svg {...p}>
+    <rect x="3" y="10" width="11" height="11" rx="1" />
+    <circle cx="16" cy="8" r="5" />
+  </Svg>
+);
+/** 위에 얹기: 겹친 두 장 */
+export const IconLayers = (p: P) => (
+  <Svg {...p}>
+    <rect x="3" y="7" width="13" height="13" rx="1.5" />
+    <rect x="8" y="3" width="13" height="13" rx="1.5" />
+  </Svg>
+);
 export const IconUpload = (p: P) => (
   <Svg {...p}>
     <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />

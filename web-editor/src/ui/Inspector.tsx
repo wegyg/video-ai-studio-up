@@ -11,6 +11,7 @@ import { useProject } from '../store/project';
 import { useUI } from '../store/ui';
 import { NumberField, SelectField, SliderField } from './fields';
 import { TransitionProps } from './TransitionProps';
+import { ShapeProps } from './ShapeProps';
 import { TextProps } from './TextProps';
 
 const FADE_MAX = 5 * FPS;
@@ -313,6 +314,7 @@ export function Inspector() {
           {!visible && <p className="px-3 pt-2 text-xs text-neutral-500">{ko.inspector.offscreen}</p>}
           {trackKind !== 'audio' && <TransformFields clip={clip} visible={visible} />}
           {clip.type === 'text' && <TextProps clip={clip} />}
+          {clip.type === 'shape' && <ShapeProps clip={clip} />}
           {isMedia(clip) && <AudioFields clip={clip} visible={visible} />}
           {isMedia(clip) && clip.type !== 'image' && <SpeedFields clip={clip} />}
         </>

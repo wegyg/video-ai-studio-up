@@ -65,7 +65,7 @@ export function needsEffects(edit: EditState): boolean {
   if (edit.background?.kind === 'blur') return true;
   for (const t of edit.tracks) {
     if (t.kind === 'video' && transitionsOf(t).length) return true;
-    for (const c of t.clips) if (c.type !== 'text' && clipAdjust(c)) return true;
+    for (const c of t.clips) if ((c.type === 'video' || c.type === 'image') && clipAdjust(c)) return true;
   }
   return false;
 }

@@ -24,7 +24,7 @@ export const hasAnyKeys = (c: Pick<Clip, 'keyframes'>): boolean => KEY_PROPS.som
 
 /** 키가 없을 때의 값 (클립 자체 값) */
 export function baseValue(c: Clip, p: KeyProp): number {
-  if (p === 'volume') return c.type === 'text' ? 1 : c.volume;
+  if (p === 'volume') return 'volume' in c ? c.volume : 1;
   return c.transform[p];
 }
 
@@ -130,7 +130,7 @@ export function setValues<T extends Clip>(c: T, frame: number, patch: Partial<Re
   }
   if (!changed) return c;
   let out: T = { ...c, transform: { ...c.transform, ...base } };
-  if (volume !== undefined && out.type !== 'text') out = { ...out, volume };
+  if (volume !== undefined && 'volume' in out) out = { ...out, volume };
   return withKeys(out, keys);
 }
 
@@ -154,7 +154,7 @@ export function toggleKeys<T extends Clip>(c: T, frame: number, props: KeyProp[]
       if (hasKeys(out, p)) continue;
       const v = valueAt(c, p, frame);
       if (p === 'volume') {
-        if (out.type !== 'text') out = { ...out, volume: v };
+        if ('volume' in out) out = { ...out, volume: v };
       } else base[p] = v;
     }
     if (Object.keys(base).length) out = { ...out, transform: { ...out.transform, ...base } };

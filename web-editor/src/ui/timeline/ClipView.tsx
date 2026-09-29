@@ -8,6 +8,7 @@ import { PEAKS_PER_SEC } from '../../media/derive-protocol';
 import { useMedia, type Filmstrip } from '../../media/store';
 import { keyOffsets, moveKeys } from '../../model/keyframes';
 import { srcAt } from '../../model/transitions';
+import { isMedia } from '../../model/ops';
 import { FPS, type Clip, type MediaClip } from '../../model/types';
 import { useProject } from '../../store/project';
 import { useUI } from '../../store/ui';
@@ -23,6 +24,7 @@ const TYPE_STYLE: Record<Clip['type'], string> = {
   image: 'bg-violet-900/80 ring-violet-500/70',
   audio: 'bg-sky-950/90 ring-sky-500/70',
   text: 'bg-amber-900/80 ring-amber-500/70',
+  shape: 'bg-fuchsia-900/80 ring-fuchsia-500/70',
 };
 
 /** 필름스트립: 높이 h에 맞춰 썸네일 비율을 유지하며 이어 그린다 */
@@ -208,8 +210,8 @@ function FadeOverlay({
 export const ClipView = memo(function ClipView({ clip, rowKind, scroller }: { clip: Clip; rowKind: keyof typeof ROW_H; scroller: HTMLDivElement | null }) {
   const ppf = useUI((s) => s.pxPerFrame);
   const selected = useUI((s) => s.selectedClipId === clip.id);
-  const assetName = useProject((s) => (clip.type === 'text' ? '' : (s.assets[clip.assetId]?.name ?? '')));
-  const hasAudio = useProject((s) => (clip.type === 'text' ? false : (s.assets[clip.assetId]?.hasAudio ?? false)));
+  const assetName = useProject((s) => (isMedia(clip) ? (s.assets[clip.assetId]?.name ?? '') : ''));
+  const hasAudio = useProject((s) => (isMedia(clip) ? (s.assets[clip.assetId]?.hasAudio ?? false) : false));
   const posterUrl = useMedia((s) => (clip.type === 'image' ? s.entries[clip.assetId]?.posterUrl : undefined));
   const width = Math.max(2, clip.duration * ppf);
   const height = ROW_H[rowKind] - PAD_Y * 2;
@@ -243,9 +245,9 @@ export const ClipView = memo(function ClipView({ clip, rowKind, scroller }: { cl
         backgroundRepeat: 'repeat-x',
       }}
     >
-      {clip.type !== 'text' && clip.type !== 'image' && <ClipCanvas clip={clip} width={width} height={height} />}
+      {isMedia(clip) && clip.type !== 'image' && <ClipCanvas clip={clip} width={width} height={height} />}
       <span className="pointer-events-none absolute top-0.5 left-2 max-w-[calc(100%-1rem)] truncate rounded bg-black/40 px-1 text-[10px] text-white/90">
-        {clip.type === 'text' ? clip.text : assetName}
+        {clip.type === 'text' ? clip.text : clip.type === 'shape' ? (ko.shapes[clip.shape] ?? '') : assetName}
       </span>
       {(clip.type === 'video' || clip.type === 'audio') && clip.speed !== 1 && (
         <span
@@ -256,7 +258,7 @@ export const ClipView = memo(function ClipView({ clip, rowKind, scroller }: { cl
           {ko.inspector.units.times}
         </span>
       )}
-      {hasAudio && clip.type !== 'text' && clip.volume !== 1 && (
+      {hasAudio && isMedia(clip) && clip.volume !== 1 && (
         <span
           data-testid="clip-volume-badge"
           className="pointer-events-none absolute right-2 bottom-0.5 rounded bg-black/60 px-1 text-[10px] tabular-nums text-amber-200"

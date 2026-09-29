@@ -9,7 +9,7 @@ import { formatTimecode } from '../model/time';
 import type { AssetMeta } from '../model/types';
 import { markMediaRemoved } from '../storage/db';
 import { useProject } from '../store/project';
-import { IconFilm, IconImage, IconMusic, IconPlus, IconUpload } from './icons';
+import { IconFilm, IconImage, IconLayers, IconMusic, IconPlus, IconUpload } from './icons';
 import { assetDrag } from './timeline/view';
 import { Waveform } from './waveform';
 
@@ -79,6 +79,18 @@ function MediaTile({ asset }: { asset: AssetMeta }) {
         >
           <IconPlus className="size-3.5" />
         </button>
+        {(asset.kind === 'image' || asset.kind === 'video') && (
+          <button
+            type="button"
+            data-testid="add-overlay"
+            aria-label={ko.media.addOverlay}
+            title={ko.media.addOverlay}
+            onClick={() => actions.addAssetAsOverlay(asset.id)}
+            className="absolute top-8 right-1 flex size-6 items-center justify-center rounded-full bg-fuchsia-600 text-white opacity-0 shadow group-hover:opacity-100 focus:opacity-100"
+          >
+            <IconLayers className="size-3.5" />
+          </button>
+        )}
         {status === 'loading' && (
           <div className="absolute inset-x-0 bottom-0 h-1 bg-neutral-700" aria-label={ko.media.preparing}>
             <div className="h-full bg-cyan-400 transition-[width]" style={{ width: `${Math.round((entry?.progress ?? 0) * 100)}%` }} />

@@ -11,6 +11,8 @@ import {
   type EditState,
   type MediaClip,
   type Ratio,
+  type ShapeClip,
+  type ShapeKind,
   type TextClip,
   type TextStyle,
   type Track,
@@ -25,7 +27,8 @@ export const DEFAULT_TRANSFORM: Transform = { x: 0, y: 0, scale: 1, rotation: 0,
 export const clipEnd = (c: { start: number; duration: number }): number => c.start + c.duration;
 export const trackKindFor = (type: Clip['type']): TrackKind =>
   type === 'text' ? 'text' : type === 'audio' ? 'audio' : 'video';
-export const isMedia = (c: Clip): c is MediaClip => c.type !== 'text';
+/** 원본 파일이 있는 클립 (영상, 이미지, 오디오) — 텍스트·도형은 아니다 */
+export const isMedia = (c: Clip): c is MediaClip => c.type === 'video' || c.type === 'image' || c.type === 'audio';
 /** 원본 길이 제한이 있는 클립 (영상, 오디오) */
 export const isSourced = (c: Clip): c is MediaClip => c.type === 'video' || c.type === 'audio';
 
@@ -63,6 +66,25 @@ export function createMediaClip(asset: AssetMeta, start: number): MediaClip {
     fadeIn: 0,
     fadeOut: 0,
     speed: 1,
+    transform: { ...DEFAULT_TRANSFORM },
+  };
+}
+
+export const SHAPE_DEFAULT_FRAMES = 5 * FPS;
+
+/** 도형 클립 (R18). 기본 5초, 400×400(삼각형·원도 같은 상자), 청록 */
+export function createShapeClip(shape: ShapeKind, start: number): ShapeClip {
+  return {
+    id: newId('clip'),
+    type: 'shape',
+    shape,
+    start: Math.max(0, Math.round(start)),
+    duration: SHAPE_DEFAULT_FRAMES,
+    width: shape === 'rect' || shape === 'rounded' ? 600 : 400,
+    height: 400,
+    fill: '#22d3ee',
+    strokeWidth: 0,
+    strokeColor: '#ffffff',
     transform: { ...DEFAULT_TRANSFORM },
   };
 }
@@ -297,7 +319,7 @@ export function splitClip(edit: EditState, clipId: string, at: number): { edit: 
 export function removeAssetClips(edit: EditState, assetId: string): EditState {
   let changed = false;
   const tracks = edit.tracks.map((t) => {
-    const clips = t.clips.filter((c) => c.type === 'text' || c.assetId !== assetId);
+    const clips = t.clips.filter((c) => !isMedia(c) || c.assetId !== assetId);
     if (clips.length === t.clips.length) return t;
     changed = true;
     return { ...t, clips };

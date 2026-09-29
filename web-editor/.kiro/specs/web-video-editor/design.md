@@ -245,6 +245,10 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
 - 속도를 바꾸면 쓰는 원본 구간을 유지한 채 길이를 바꾸고, 같은 트랙의 뒤 클립을 그만큼 옮긴다(맞닿은 곳·트랜지션 유지). 자막·BGM이 있는 다른 트랙은 옮기지 않는다.
 - 소리: 미리보기는 `playbackRate` + `preservesPitch`. 내보내기는 음 높이 유지면 WSOLA(창 40ms Hann, 50% 겹침, ±10ms 안에서 가장 잘 이어지는 곳 찾기, 모든 채널 같은 위치), 아니면 `AudioBufferSourceNode.playbackRate`.
 
+### 오버레이 (2-5)
+- 로고·화면 속 화면은 새 기능이 아니라 **위 영상 트랙의 사진·영상 클립**이다(투명 PNG는 2D 합성에서 그대로 투명). "위에 얹기"는 트랙 선택과 기본 배치(오른쪽 위, 안전 영역 아래)만 정한다.
+- 도형은 새 클립 종류 `shape`(원본 파일 없음, `isMedia`가 아님). `drawFrame`이 영상 트랙 순서대로 Canvas 2D 경로로 그리므로 미리보기·내보내기가 같다. 선택 상자 크기 = 도형 가로·세로 × 크기.
+
 ### 원본 색 해석 맞추기 (`media/color.ts`)
 미리보기는 `<video>`가, 내보내기는 WebCodecs(Mediabunny)가 원본을 푼다. 원본에 색 정보(primaries·transfer·matrix)가 셋 다 있지 않으면:
 - Chrome `<video>`: 모두 버리고 세로(natural) 720 미만은 BT.601, 이상은 BT.709로 가정 (Chromium `media/ffmpeg/ffmpeg_common.cc`, VP9·AV1 제외)

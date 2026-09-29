@@ -7,7 +7,7 @@
 import { clipAdjust, DEFAULT_BACKGROUND } from '../model/filters';
 import { clipAtFrame } from '../model/keyframes';
 import { TRANSITION_KINDS, visualAt } from '../model/transitions';
-import { RATIO_SIZE, type ColorAdjust, type Clip, type EditState, type MediaClip, type TextClip, type Track, type Transform } from '../model/types';
+import { RATIO_SIZE, type ColorAdjust, type Clip, type EditState, type MediaClip, type ShapeClip, type TextClip, type Track, type Transform } from '../model/types';
 
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -98,7 +98,7 @@ interface Part {
   src: VisualSource;
 }
 /** 영상 트랙 하나가 이 프레임에 그릴 것: 클립 하나, 또는 트랜지션 중인 두 클립 */
-type Layer = { one: Part } | { from: Part | null; to: Part | null; kind: number; progress: number };
+type Layer = { one: Part } | { from: Part | null; to: Part | null; kind: number; progress: number } | { shape: ShapeClip };
 
 /** 트랜지션 장면용 캔버스 (미리보기·내보내기 Worker 각자 한 벌) */
 const sceneCache: { canvas: OffscreenCanvas; ctx: OffscreenCanvasRenderingContext2D }[] = [];
@@ -112,6 +112,36 @@ function scene(i: number, w: number, h: number): { canvas: OffscreenCanvas; ctx:
     s.canvas.height = h;
   }
   return s;
+}
+
+/** 도형 클립 (R18): 배치(위치·크기·회전·투명도)대로 단색 도형을 그린다 */
+function drawShape(ctx: Ctx2D, c: ShapeClip, W: number, H: number): void {
+  const t = c.transform;
+  const w = c.width;
+  const h = c.height;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, t.opacity));
+  ctx.translate(W / 2 + t.x, H / 2 + t.y);
+  ctx.rotate((t.rotation * Math.PI) / 180);
+  ctx.scale(t.scale, t.scale);
+  ctx.beginPath();
+  if (c.shape === 'circle') ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+  else if (c.shape === 'triangle') {
+    ctx.moveTo(0, -h / 2);
+    ctx.lineTo(w / 2, h / 2);
+    ctx.lineTo(-w / 2, h / 2);
+    ctx.closePath();
+  } else if (c.shape === 'rounded') ctx.roundRect(-w / 2, -h / 2, w, h, Math.min(w, h) * 0.2);
+  else ctx.rect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = c.fill;
+  ctx.fill();
+  if (c.strokeWidth > 0) {
+    ctx.lineWidth = c.strokeWidth;
+    ctx.strokeStyle = c.strokeColor;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** 클립 하나를 배치대로 그린다 (필터가 있으면 셰이더를 거쳐서) */
@@ -141,7 +171,11 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
   const video = edit.tracks.filter((t) => t.kind === 'video');
   for (let i = video.length - 1; i >= 0; i--) {
     const v = visualAt(video[i], frame);
-    if (!v) continue;
+    if (!v) {
+      const c = clipAt(video[i], frame);
+      if (c?.type === 'shape') layers.push({ shape: clipAtFrame(c, frame) });
+      continue;
+    }
     if (v.transition && fx) {
       const a = sources.visual(v.transition.from, frame);
       const b = sources.visual(v.transition.to, frame);
@@ -161,10 +195,10 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
 
   // 흐림 배경: 맨 아래 층을 화면에 꽉 차게 흐리게 깐다 (그 층이 화면을 다 덮으면 생략).
   // 맨 아래 층이 트랜지션 중이면 두 클립의 흐린 배경을 진행도만큼 섞는다
-  if (bg.kind === 'blur' && fx && layers.length) {
+  if (bg.kind === 'blur' && fx && layers.length && !('shape' in layers[0])) {
     const base = layers[0];
     const parts: [Part, number][] = 'one' in base ? [[base.one, 1]] : [];
-    if (!('one' in base)) {
+    if ('from' in base) {
       if (base.from) parts.push([base.from, 1]);
       if (base.to) parts.push([base.to, base.from ? base.progress : 1]);
     }
@@ -182,6 +216,10 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
   for (const layer of layers) {
     if ('one' in layer) {
       drawPart(ctx, layer.one, W, H, fx, pxScale);
+      continue;
+    }
+    if ('shape' in layer) {
+      drawShape(ctx, layer.shape, W, H);
       continue;
     }
     // 트랜지션: 두 클립을 각자 장면으로 그린 뒤 셰이더로 섞는다 (장면 = 이 층만, 투명 배경)

@@ -3,7 +3,7 @@
  */
 import { ko } from './i18n/ko';
 import { toast } from './ui/toasts';
-import { clipEnd, createMediaClip, createTextClip, DEFAULT_TRANSFORM, defaultTrackFor, findClip, trackKindFor } from './model/ops';
+import { clipEnd, createMediaClip, createShapeClip, createTextClip, DEFAULT_TRANSFORM, defaultTrackFor, findClip, isMedia, trackKindFor } from './model/ops';
 import { NEUTRAL_ADJUST, presetFilter } from './model/filters';
 import { keyOffsets, setEaseAt, setValues, toggleKeys, TRANSFORM_PROPS } from './model/keyframes';
 import {
@@ -14,7 +14,8 @@ import {
   transitionInto,
   type Cut,
 } from './model/transitions';
-import type { Clip, ColorAdjust, EditState, Easing, KeyProp, MediaClip, Ratio, TextStyle, Track, TransitionKind } from './model/types';
+import { RATIO_SIZE, type AssetMeta, type Clip, type ColorAdjust, type EditState, type Easing, type KeyProp, type MediaClip, type Ratio, type ShapeKind, type TextStyle, type Track, type TransitionKind } from './model/types';
+import { SAFE_AREA } from './engine/text';
 import { history } from './store/history';
 import { useProject } from './store/project';
 import { useUI } from './store/ui';
@@ -44,6 +45,36 @@ function fixSelection(): void {
     const loc = findClip(edit, selectedTransition);
     if (!loc || !transitionInto(loc.track, selectedTransition)) selectTransition(null);
   }
+}
+
+/**
+ * 오버레이를 얹을 트랙: 메인(맨 아래) 영상 트랙이 아닌 가장 위 영상 트랙. 없으면 새로 만든다 (R18)
+ */
+function overlayTrack(): Track | null {
+  const find = () => {
+    const video = useProject.getState().edit.tracks.filter((t) => t.kind === 'video');
+    return video.length > 1 ? video[0] : null;
+  };
+  if (!find()) useProject.getState().addTrack('video');
+  return find();
+}
+
+/** 로고·화면 속 화면 기본 배치: 오른쪽 위(쇼츠 위쪽 UI에 가리지 않는 곳), 사진 30% · 영상 40% */
+function overlayTransform(asset: AssetMeta, ratio: Ratio) {
+  const { width: W, height: H } = RATIO_SIZE[ratio];
+  const scale = asset.kind === 'video' ? 0.4 : 0.3;
+  const sw = asset.width ?? W;
+  const sh = asset.height ?? H;
+  const fit = Math.min(W / sw, H / sh);
+  const bw = sw * fit * scale;
+  const bh = sh * fit * scale;
+  return {
+    x: Math.round(W / 2 - W * 0.05 - bw / 2),
+    y: Math.round(-H / 2 + H * SAFE_AREA.top + bh / 2),
+    scale,
+    rotation: 0,
+    opacity: 1,
+  };
 }
 
 /** 이 트랙에서 toClipId로 들어가는 경계 */
@@ -137,7 +168,7 @@ export const actions = {
     const loc = id ? findClip(useProject.getState().edit, id) : null;
     if (!loc || (loc.clip.type !== 'video' && loc.clip.type !== 'image')) return;
     useProject.getState().updateClip(loc.clip.id, (c) => {
-      if (c.type === 'text') return c;
+      if (!isMedia(c)) return c;
       const prev = c.filter ?? { preset: null, adjust: { ...NEUTRAL_ADJUST } };
       return { ...c, filter: { ...prev, adjust: { ...prev.adjust, [key]: value } } };
     });
@@ -181,7 +212,7 @@ export const actions = {
   },
   setTransitionKind(toClipId: string, kind: TransitionKind): void {
     useProject.getState().updateClip(toClipId, (c) =>
-      c.type !== 'text' && c.transitionIn ? ({ ...c, transitionIn: { ...c.transitionIn, kind } } as Clip) : c,
+      isMedia(c) && c.transitionIn ? ({ ...c, transitionIn: { ...c.transitionIn, kind } } as Clip) : c,
     );
   },
   /** 길이(프레임). 양쪽 클립 안에 들어가게 줄인다 */
@@ -191,12 +222,12 @@ export const actions = {
     const max = maxTransitionFrames(loc.track, toClipId);
     const d = Math.max(TRANSITION_MIN, Math.min(max, Math.round(frames)));
     useProject.getState().updateClip(toClipId, (c) =>
-      c.type !== 'text' && c.transitionIn && c.transitionIn.duration !== d ? ({ ...c, transitionIn: { ...c.transitionIn, duration: d } } as Clip) : c,
+      isMedia(c) && c.transitionIn && c.transitionIn.duration !== d ? ({ ...c, transitionIn: { ...c.transitionIn, duration: d } } as Clip) : c,
     );
   },
   removeTransition(toClipId: string): void {
     useProject.getState().updateClip(toClipId, (c) => {
-      if (c.type === 'text' || !c.transitionIn) return c;
+      if (!isMedia(c) || !c.transitionIn) return c;
       const rest: MediaClip = { ...c };
       delete rest.transitionIn;
       return rest;
@@ -238,7 +269,7 @@ export const actions = {
     useProject.getState().setSpeed(clipId, speed);
   },
   setKeepPitch(clipId: string, keep: boolean): void {
-    useProject.getState().updateClip(clipId, (c) => (c.type === 'text' || (c.keepPitch !== false) === keep ? c : { ...c, keepPitch: keep }));
+    useProject.getState().updateClip(clipId, (c) => (!isMedia(c) || (c.keepPitch !== false) === keep ? c : { ...c, keepPitch: keep }));
   },
   /** 화면 배치 초기화: 배치 키프레임도 지운다 */
   resetTransform(clipId: string): void {
@@ -250,6 +281,26 @@ export const actions = {
       else delete out.keyframes;
       return out;
     });
+  },
+  /** 사진(투명 PNG 로고)·영상을 위 트랙에 작게 얹는다 — 로고, 화면 속 화면(PIP) (R18) */
+  addAssetAsOverlay(assetId: string): string | null {
+    const p = useProject.getState();
+    const asset = p.assets[assetId];
+    if (!asset || (asset.kind !== 'image' && asset.kind !== 'video')) return null;
+    const track = overlayTrack();
+    if (!track) return null;
+    const clip = { ...createMediaClip(asset, useUI.getState().playhead), transform: overlayTransform(asset, p.edit.ratio) };
+    const id = useProject.getState().addClip(track.id, clip);
+    if (id) useUI.getState().select(id);
+    return id;
+  },
+  /** 도형 넣기 (R18): 위 영상 트랙의 플레이헤드 위치 (차 있으면 가장 가까운 빈 곳) */
+  addShape(shape: ShapeKind): string | null {
+    const track = overlayTrack();
+    if (!track) return null;
+    const id = useProject.getState().addClip(track.id, createShapeClip(shape, useUI.getState().playhead));
+    if (id) useUI.getState().select(id);
+    return id;
   },
   /** 텍스트 클립 추가 (R7.1). 첫 텍스트 트랙의 플레이헤드 위치에 넣고 선택한다 */
   addTextClip(style?: TextStyle): string | null {
