@@ -1,5 +1,7 @@
 /** 테스트용 창구: window.__editor. 편집기 내부 상태를 읽기 전용 데이터로 노출한다. */
 import type { EditorDebugApi } from './debug-types';
+import { useMedia } from './media/store';
+import { db, listMediaSizes } from './storage/db';
 import { useProject } from './store/project';
 import { useUI } from './store/ui';
 import { detectSupport } from './support';
@@ -24,6 +26,34 @@ export const debugApi: EditorDebugApi = {
       }),
     );
   },
+  media: (id) => {
+    const e = useMedia.getState().entries[id];
+    if (!e) return null;
+    const f = e.filmstrip;
+    return {
+      status: e.status,
+      progress: e.progress,
+      hasUrl: !!e.url,
+      hasPoster: !!e.posterUrl,
+      filmstrip: f ? { count: f.count, interval: f.interval, thumbW: f.thumbW, thumbH: f.thumbH, cols: f.cols } : null,
+      peaksLength: e.peaks?.length ?? 0,
+      peaksMax: e.peaks ? e.peaks.reduce((m, v) => Math.max(m, v), 0) : 0,
+    };
+  },
+  filmstripPixel: (id, index) => {
+    const f = useMedia.getState().entries[id]?.filmstrip;
+    if (!f || index >= f.count) return null;
+    const c = new OffscreenCanvas(1, 1);
+    const ctx = c.getContext('2d')!;
+    const sx = (index % f.cols) * f.thumbW + f.thumbW / 2;
+    const sy = Math.floor(index / f.cols) * f.thumbH + f.thumbH / 2;
+    ctx.drawImage(f.bitmap, sx, sy, 1, 1, 0, 0, 1, 1);
+    return [...ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  },
+  stored: async () => ({
+    media: await listMediaSizes(),
+    derivedKeys: (await (await db()).getAllKeys('derived')).map(String),
+  }),
 };
 
 export function installDebugApi(): void {

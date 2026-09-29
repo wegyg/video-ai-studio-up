@@ -44,6 +44,12 @@ run('pattern.mov', [
   '-c:a', 'aac', '-b:a', '96k',
 ]);
 
+// 2-1) HEVC(H.265) mp4 — 아이폰 영상처럼 브라우저가 디코딩하지 못할 수 있는 코덱 (거부 메시지 테스트용)
+run('hevc.mp4', [
+  '-f', 'lavfi', '-i', 'testsrc2=s=320x180:r=30:d=1',
+  '-c:v', 'libx265', '-pix_fmt', 'yuv420p', '-tag:v', 'hvc1', '-x265-params', 'log-level=error',
+]);
+
 // 3) 이미지: PNG 400x400 청록, JPG 600x400 주황.
 run('image.png', ['-f', 'lavfi', '-i', 'color=c=0x00FFFF:s=400x400', '-frames:v', '1']);
 run('image.jpg', ['-f', 'lavfi', '-i', 'color=c=0xFF8800:s=600x400', '-frames:v', '1', '-q:v', '3']);

@@ -35,11 +35,26 @@ export interface DebugState {
   history: { past: number; future: number };
 }
 
+export interface DebugMedia {
+  status: string;
+  progress: number;
+  hasUrl: boolean;
+  hasPoster: boolean;
+  filmstrip: { count: number; interval: number; thumbW: number; thumbH: number; cols: number } | null;
+  peaksLength: number;
+  peaksMax: number;
+}
+
 export interface EditorDebugApi {
   version: string;
   support: () => Promise<Record<string, boolean>>;
   spike: (video: Blob) => Promise<SpikeResult>;
   state: () => DebugState;
+  media: (assetId: string) => DebugMedia | null;
+  /** 필름스트립 index번째 썸네일 가운데 픽셀 [r,g,b] */
+  filmstripPixel: (assetId: string, index: number) => number[] | null;
+  /** IndexedDB에 저장된 원본/파생 데이터 */
+  stored: () => Promise<{ media: { id: string; size: number; name: string }[]; derivedKeys: string[] }>;
   [key: string]: unknown;
 }
 
