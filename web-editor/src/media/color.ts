@@ -5,7 +5,7 @@
  * 셋 다 있지 않으면 전부 버리고 세로 해상도로 가정한다: 720 미만은 BT.601, 720 이상은 BT.709
  * (Chromium media/ffmpeg/ffmpeg_common.cc AVStreamToVideoDecoderConfig — VP9·AV1은 가정하지 않음).
  * 내보내기가 쓰는 Mediabunny(1.60)는 빈 칸을 모두 BT.709로 채운다(media-sink.js VideoDecoderWrapper).
- * 그래서 색 정보 없는 SD 영상(예: 640x360)은 내보내면 색이 달라졌다(평균 8/255 차이, docs/perf.md).
+ * 그래서 색 정보 없는 SD 영상(예: 640x360)은 내보내면 색이 달라졌다(평균 8/255 차이, 설계 §13).
  *
  * 디코더 설정의 색 공간을 Chrome이 <video>에 주는 값과 똑같이 넣어 두면, 두 길이 같은 설정으로
  * 같은 디코더를 쓰게 되어 플랫폼(Windows 하드웨어 디코더 포함)과 상관없이 같은 색이 나온다.

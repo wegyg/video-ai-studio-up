@@ -29,7 +29,7 @@ import { matchPreviewColor } from '../../media/color';
 import { needsEffects } from '../../model/filters';
 import { sourceFrame, visibleRange, visualAt } from '../../model/transitions';
 import { drawTextClip } from '../text';
-import type { EditState, MediaClip, Track } from '../../model/types';
+import { RATIO_SIZE, type EditState, type MediaClip, type Track } from '../../model/types';
 import type { ExportMessage, ExportRequest } from './protocol';
 
 const port = self as unknown as {
@@ -109,6 +109,9 @@ async function run(req: ExportRequest): Promise<void> {
   const videos = new Map<string, { track: InputVideoTrack; width: number; height: number }>();
   const images = new Map<string, ImageBitmap>();
   const edit: EditState = req.project.edit;
+  // 합성 좌표는 프로젝트 해상도(예: 1080×1920). 출력(W×H)이 다르면 캔버스 배율만 바꾼다 (미리보기와 같은 방식)
+  const { width: PW, height: PH } = RATIO_SIZE[edit.ratio];
+  const outScale = W / PW;
 
   const usedAssets = new Set<string>();
   for (const t of edit.tracks) for (const c of t.clips) if (c.type === 'video' || c.type === 'image') usedAssets.add(c.assetId);
@@ -171,8 +174,8 @@ async function run(req: ExportRequest): Promise<void> {
       if (!r) {
         const v = videos.get(clip.assetId);
         if (!v) return null;
-        const drawn = baseSize(v.width, v.height, W, H);
-        const k = Math.min(1, (drawn.w * Math.max(0.05, clip.transform.scale)) / v.width);
+        const drawn = baseSize(v.width, v.height, PW, PH);
+        const k = Math.min(1, (drawn.w * Math.max(0.05, clip.transform.scale) * outScale) / v.width);
         const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
         const sink =
           k > 0.95
@@ -238,9 +241,9 @@ async function run(req: ExportRequest): Promise<void> {
     const effects = needsEffects(edit) ? createEffects() : null;
     const sources: FrameSources = {
       visual: (clip) => pending.get(clip.id) ?? null,
-      text: (c, clip, frame) => drawTextClip(c, clip, W, H, frame),
+      text: (c, clip, frame) => drawTextClip(c, clip, PW, PH, frame),
       effects,
-      effectScale: 1,
+      effectScale: outScale,
     };
 
     // 소리는 1초 분량씩 넣는다 (영상과 번갈아 → 메모리에 쌓이지 않게)
@@ -270,6 +273,7 @@ async function run(req: ExportRequest): Promise<void> {
     for (let frame = 0; frame < totalFrames; frame++) {
       if (canceled) break;
       await prepare(frame);
+      ctx.setTransform(outScale, 0, 0, outScale, 0, 0);
       drawFrame(ctx, edit, frame, sources);
       // await가 인코더의 속도에 맞춰 준다 (메모리가 무한히 늘지 않는다)
       await videoSource.add(frame / fps, 1 / fps);

@@ -33,7 +33,6 @@ test('원본을 푸는 두 길(<video> / 내보내기 디코더)의 색이 같�
 });
 
 test('미리보기 = 내보내기: 색 정보 없는 SD 원본(640×360)도 필터 없이 같은 색으로 나온다', async ({ page }) => {
-  test.setTimeout(180_000);
   await page.addInitScript(() => {
     delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
   });

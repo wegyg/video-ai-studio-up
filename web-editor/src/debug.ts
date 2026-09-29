@@ -1,7 +1,7 @@
 /** 테스트용 창구: window.__editor. 편집기 내부 상태를 읽기 전용 데이터로 노출한다. */
 import type { EditorDebugApi } from './debug-types';
 import { previewRef } from './engine/preview/PreviewEngine';
-import { lastExportBuffer } from './engine/export';
+import { lastExportBuffer, setExportSizeOverride } from './engine/export';
 import { cleanupStorage, saveNow, savedTimes } from './storage/persist';
 import { toProjectFile } from './storage/project-json';
 import { useMedia } from './media/store';
@@ -61,6 +61,7 @@ export const debugApi: EditorDebugApi = {
   preview: () => previewRef.current?.stats() ?? null,
   clipGain: (clipId) => previewRef.current?.clipGain(clipId) ?? null,
   setPreviewResolution: (w, h) => previewRef.current?.resize(w, h, 1),
+  setExportSize: (w, h) => setExportSizeOverride(w && h ? { width: w, height: h } : null),
   saveNow: () => saveNow(),
   savedTimes: () => savedTimes(),
   cleanupStorage: (daysLater = 0) => cleanupStorage({ now: Date.now() + daysLater * 24 * 60 * 60 * 1000 }),

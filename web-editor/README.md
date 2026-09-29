@@ -41,12 +41,8 @@ npx serve dist
 | `npm run preview` | 빌드한 `dist/`를 http://localhost:4173 으로 띄우기 |
 | `npm run test:unit` | 단위 테스트 (Vitest) |
 | `npx playwright test` | E2E 테스트 (실제 Google Chrome 필요, `npm run build` 먼저) |
-| `npm run fixtures:perf` | 성능 측정용 1080p 클립 5개 만들기 (ffmpeg 필요) |
 
 E2E 테스트 중 일부는 추가 조건이 있을 때만 돕니다.
-- `PERF_DIR=$PWD/.perf-fixtures` — 수용 기준 A1(재생 성능)·A2(60초 내보내기 시간). CPU를 많이 쓰므로 따로 하나씩 돌립니다:
-  `PERF_DIR=$PWD/.perf-fixtures npx playwright test acceptance -g "A1|A2" --workers=1`
-  (필터·흐림 배경을 켠 내보내기 A2-필터·A2-배경도 함께 돕니다. CI에서는 `A2_FX=1`일 때만 — GPU가 없어 몇 분씩 걸립니다. 결과는 `docs/perf.md`)
 - `FFMPEG_PATH`, `FFPROBE_PATH` (또는 PATH의 ffmpeg) — 내보낸 MP4를 **Chrome이 아닌 디코더**로 풀어 미리보기와 비교(휴대폰 재생 확인)
 - `BASE_URL=https://…` — 배포된 사이트를 대상으로 같은 테스트 실행
 
@@ -56,4 +52,4 @@ GitHub Actions(`.github/workflows/web-editor-pages.yml`)가 push마다 단위·E
 Vite + React + TypeScript, Zustand(+ zundo 실행 취소), Tailwind CSS, Canvas 2D 합성,
 Mediabunny(MP4 읽기/쓰기, WebCodecs), IndexedDB(idb). 글꼴은 Pretendard와 Noto Sans KR을 앱에 포함합니다(SIL OFL 1.1, `src/assets/fonts/LICENSE-*.txt`).
 
-문서: 요구사항·설계·태스크는 `.kiro/specs/web-video-editor/`, 기술 검증 결과는 `docs/spike.md`, 성능 측정은 `docs/perf.md`.
+문서: 요구사항·설계·태스크는 `.kiro/specs/web-video-editor/`, 기술 검증 결과는 `docs/spike.md`. 성능(재생·내보내기 시간)은 Windows 노트북에서 내보내기 창에 표시되는 시간으로 확인합니다(샌드박스 측정 불가).

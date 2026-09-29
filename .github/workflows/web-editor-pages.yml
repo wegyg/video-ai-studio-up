@@ -45,13 +45,11 @@ jobs:
       - name: 빌드 (타입 검사 포함)
         run: npm run build
 
-      # 수용 기준 A1(재생 성능)·A2(내보내기 시간)에 쓰는 1080p 12초 × 5 파일.
-      # 60MB라 저장소에 넣지 않고 그때그때 만든다.
-      - name: 성능 측정용 큰 파일 준비
+      # 내보낸 MP4를 Chrome이 아닌 디코더로 풀어 미리보기와 비교한다 (phone.spec — 휴대폰 재생 확인)
+      - name: ffmpeg 설치
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
-          npm run fixtures:perf
 
       - name: E2E 테스트 (Playwright, chrome 채널)
         # pipefail: 테스트가 실패하면 tee가 있어도 이 단계가 실패해야 배포가 막힌다
@@ -60,25 +58,16 @@ jobs:
           set -o pipefail
           npx playwright test 2>&1 | tee ../playwright-output.txt
 
-      # A1(재생)·A2(60초 내보내기)는 CPU를 다 쓰므로 다른 테스트와 겹치면 서로의 시간 측정을 망친다 → 따로, 하나씩
-      - name: 수용 기준 A1·A2 (단독 실행)
-        env:
-          PERF_DIR: ${{ github.workspace }}/web-editor/.perf-fixtures
-        shell: bash
-        run: |
-          set -o pipefail
-          npx playwright test acceptance -g "A1|A2" --workers=1 2>&1 | tee ../playwright-perf-output.txt
-
-      - name: 성능·내보내기 측정값 요약에 적기
+      - name: 검사 값 요약에 적기
         if: always()
         working-directory: .
         run: |
           {
-            echo "### 확인 2 체크리스트 측정값 (러너: 2코어, GPU 없음 — A1·A2는 기록만)"
+            echo "### 검사 값 (반응 시간·소리 크기·휴대폰 재생 비교, 픽셀 차이)"
             echo '```'
-            cat playwright-output.txt playwright-perf-output.txt 2>/dev/null | grep -aE "^(A1|A2|PHONE|LATENCY|AUDIBLE) " || echo "측정값 없음"
+            cat playwright-output.txt 2>/dev/null | grep -aE "^(PHONE|LATENCY|AUDIBLE|FILTER_EXPORT|SD_EXPORT|TRANSITION_EXPORT) " || echo "값 없음"
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY""
 
       - name: 테스트 리포트와 샘플 영상 업로드
         if: always()

@@ -70,7 +70,6 @@ test('누르면 바로: 경계에 디졸브가 들어가 한 번 재생되고, �
 });
 
 test('트랜지션 11종: 모두 들어가고, 같은 프레임에서 서로 다른 화면을 만든다', async ({ page }) => {
-  test.setTimeout(180_000);
   await setup(page, ['pattern.mov', 'color-steps.mp4']);
   await addViaPlus(page, 'pattern.mov'); // 0~90 (움직이는 무늬)
   const b = await addViaPlus(page, 'color-steps.mp4'); // 90~210
@@ -227,7 +226,6 @@ test('트랜지션은 새로고침해도 남는다', async ({ page }) => {
 });
 
 test('미리보기 = 내보내기: 트랜지션 3종(디졸브·슬라이드·글리치)이 걸린 프레임 3곳의 픽셀이 같다', async ({ page }) => {
-  test.setTimeout(240_000);
   await setup(page, ['pattern.mov', 'color-steps.mp4', 'image.png', 'image.jpg']);
   await addViaPlus(page, 'pattern.mov'); // 0~90
   const b = await addViaPlus(page, 'color-steps.mp4'); // 90~210

@@ -60,18 +60,24 @@ export const meanDiff = (a: number[], b: number[]) => a.reduce((s, v, i) => s + 
 /** 내보내기 창을 열어 기본 설정으로 내보내고 닫는다 (다운로드 저장 경로) */
 export async function runExport(page: Page): Promise<void> {
   await page.getByTestId('open-export').click();
-  await Promise.all([page.waitForEvent('download', { timeout: 150_000 }), page.getByTestId('export-start').click()]);
-  await expect(page.getByTestId('export-done')).toBeVisible({ timeout: 150_000 });
+  await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByTestId('export-start').click()]);
+  await expect(page.getByTestId('export-done')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('export-close').click();
 }
 
+/** 효과·필터·트랜지션 비교 해상도 (작게 — 빠르게 내보내고 몇 프레임만 비교한다) */
+export const COMPARE_SIZE: [number, number] = [360, 640];
+
 /**
- * 미리보기를 내보내기와 같은 해상도로 그린 뒤 frames의 격자를 모으고, 내보내서 같은 프레임과 비교한다.
+ * 미리보기와 내보내기를 같은 작은 해상도(360×640)로 맞춘 뒤 frames의 격자를 모으고, 내보내서 같은 프레임과 비교한다.
  * @returns 프레임별 평균 차이 (0~255)
  */
 export async function previewVsExport(page: Page, frames: number[], label: string): Promise<number[]> {
-  // 작은 미리보기는 확대 방식 차이만큼 흐릿하므로 내보내기와 같은 1080×1920으로 그린다
-  await page.evaluate(() => window.__editor.setPreviewResolution(1080, 1920));
+  const [w, h] = COMPARE_SIZE;
+  await page.evaluate(([w, h]) => {
+    window.__editor.setPreviewResolution(w, h);
+    window.__editor.setExportSize(w, h);
+  }, [w, h]);
   const preview: number[][] = [];
   for (const f of frames) {
     await seekRuler(page, f);
@@ -82,7 +88,7 @@ export async function previewVsExport(page: Page, frames: number[], label: strin
   const diffs: number[] = [];
   for (let i = 0; i < frames.length; i++) {
     const { grid, info } = await exportGrid(page, frames[i]);
-    expect([info.width, info.height]).toEqual([1080, 1920]);
+    expect([info.width, info.height]).toEqual([w, h]);
     diffs.push(Number(meanDiff(preview[i], grid).toFixed(2)));
   }
   console.log(`${label} ${JSON.stringify(diffs)}`);

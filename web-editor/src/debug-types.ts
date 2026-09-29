@@ -108,6 +108,8 @@ export interface EditorDebugApi {
   clipGain: (clipId: string) => number | null;
   /** 미리보기 캔버스 해상도를 강제로 바꾼다 (진단용: 해상도 차이인지 내용 차이인지 가르기) */
   setPreviewResolution: (w: number, h: number) => void;
+  /** 내보내기 해상도를 바꾼다 (0, 0이면 프로젝트 해상도로 되돌림) — 효과 비교를 작은 해상도로 빠르게 */
+  setExportSize: (w: number, h: number) => void;
   /** 지금 상태를 바로 저장한다 (자동 저장을 기다리지 않고) */
   saveNow: () => Promise<void>;
   /** 저장이 몇 번 일어났는지 */

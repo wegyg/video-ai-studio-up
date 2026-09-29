@@ -81,6 +81,15 @@ export function relayToFile(file: FileSystemWritableFileStream): WritableStream 
 let lastExport: ArrayBuffer | null = null;
 export const lastExportBuffer = (): ArrayBuffer | null => lastExport;
 
+/**
+ * 검증용: 내보내기 해상도를 바꾼다 (E2E가 효과·트랜지션을 작은 해상도로 빠르게 비교하려고). null = 프로젝트 해상도.
+ * 합성은 프로젝트 좌표 그대로 하고 캔버스 배율만 바꾼다 — 미리보기가 작은 캔버스에 그리는 방식과 같다.
+ */
+let sizeOverride: { width: number; height: number } | null = null;
+export function setExportSizeOverride(size: { width: number; height: number } | null): void {
+  sizeOverride = size;
+}
+
 export class ExportJob {
   private worker: Worker | null = null;
   private startedAt = 0;
@@ -101,7 +110,7 @@ export class ExportJob {
       this.handlers.onError?.('empty');
       return;
     }
-    const { width, height } = RATIO_SIZE[edit.ratio];
+    const { width, height } = sizeOverride ?? RATIO_SIZE[edit.ratio];
     this.startedAt = performance.now();
     this.samples = [];
     this.canceledByUser = false;

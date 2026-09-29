@@ -151,7 +151,6 @@ test('흐림 채우기: 16:9 영상을 9:16에 넣으면 위아래가 검정 대
 });
 
 test('미리보기 = 내보내기: 필터 + 흐림 배경을 적용한 프레임 3곳의 픽셀이 같다', async ({ page }) => {
-  test.setTimeout(240_000);
   await setup(page, ['pattern.mov', 'color-steps.mp4']);
   const bottom = await addViaPlus(page, 'pattern.mov'); // 메인 트랙 0~90 (16:9)
   await page.getByRole('tab', { name: '효과' }).click();
