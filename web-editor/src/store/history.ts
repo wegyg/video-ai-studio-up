@@ -26,7 +26,8 @@ export const history = {
     return gestureBefore !== null;
   },
   beginGesture(): void {
-    if (gestureBefore) return;
+    // 이전 제스처가 끝나지 않았으면(이벤트 유실 등) 먼저 확정한다 — 기록이 멈춘 채로 남지 않게
+    if (gestureBefore) history.endGesture();
     gestureBefore = useProject.getState().edit;
     useProject.temporal.getState().pause();
   },

@@ -1,5 +1,6 @@
 /** 미디어 패널: 가져오기(버튼, 끌어다 놓기), 썸네일 목록. 썸네일은 타임라인으로 끌어 넣을 수 있다(태스크 4). */
 import { useRef, useState, type DragEvent } from 'react';
+import { actions } from '../actions';
 import { ko } from '../i18n/ko';
 import { hasFiles, importFiles } from '../media/import';
 import { ACCEPT, ACCEPT_AUDIO } from '../media/probe';
@@ -7,7 +8,8 @@ import { useMedia } from '../media/store';
 import { formatTimecode } from '../model/time';
 import type { AssetMeta } from '../model/types';
 import { useProject } from '../store/project';
-import { IconFilm, IconImage, IconMusic, IconUpload } from './icons';
+import { IconFilm, IconImage, IconMusic, IconPlus, IconUpload } from './icons';
+import { assetDrag } from './timeline/view';
 import { Waveform } from './waveform';
 
 /** 타임라인으로 끌 때 dataTransfer 형식 */
@@ -19,6 +21,10 @@ function MediaTile({ asset }: { asset: AssetMeta }) {
   const onDragStart = (e: DragEvent) => {
     e.dataTransfer.setData(ASSET_DRAG_TYPE, asset.id);
     e.dataTransfer.effectAllowed = 'copy';
+    assetDrag.id = asset.id;
+  };
+  const onDragEnd = () => {
+    assetDrag.id = null;
   };
   const Icon = asset.kind === 'video' ? IconFilm : asset.kind === 'image' ? IconImage : IconMusic;
   return (
@@ -29,6 +35,7 @@ function MediaTile({ asset }: { asset: AssetMeta }) {
       data-status={status}
       draggable
       onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       title={asset.name}
       className="group relative cursor-grab overflow-hidden rounded-md bg-neutral-800 ring-1 ring-neutral-700/60 hover:ring-cyan-500/60"
     >
@@ -46,6 +53,16 @@ function MediaTile({ asset }: { asset: AssetMeta }) {
           </span>
         )}
         <span className="absolute top-1 left-1 rounded bg-black/60 px-1 text-[10px] text-neutral-300">{ko.media.kind[asset.kind]}</span>
+        <button
+          type="button"
+          data-testid="add-to-timeline"
+          aria-label={ko.media.addToTimeline}
+          title={ko.media.addToTimeline}
+          onClick={() => actions.addAssetToTimeline(asset.id)}
+          className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-cyan-500 text-white opacity-0 shadow group-hover:opacity-100 focus:opacity-100"
+        >
+          <IconPlus className="size-3.5" />
+        </button>
         {status === 'loading' && (
           <div className="absolute inset-x-0 bottom-0 h-1 bg-neutral-700" aria-label={ko.media.preparing}>
             <div className="h-full bg-cyan-400 transition-[width]" style={{ width: `${Math.round((entry?.progress ?? 0) * 100)}%` }} />

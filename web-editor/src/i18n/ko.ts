@@ -40,6 +40,7 @@ export const ko = {
     dropHere: '여기에 놓으면 가져옵니다',
     preparing: '준비 중',
     kind: { video: '영상', image: '이미지', audio: '오디오' },
+    addToTimeline: '타임라인에 추가 (플레이헤드 위치)',
   },
   importErrors: {
     line: (name: string, reason: string) => `${name}: ${reason}`,
@@ -93,6 +94,10 @@ export const ko = {
     mute: '음소거',
     unmute: '음소거 해제',
     ruler: '시간 눈금',
+    addVideoTrack: '영상 트랙 추가',
+    addAudioTrack: '오디오 트랙 추가',
+    videoTrackShort: '영상',
+    audioTrackShort: '오디오',
   },
   tracks: {
     text: '텍스트',

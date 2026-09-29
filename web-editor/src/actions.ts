@@ -1,7 +1,7 @@
 /**
  * 사용자 명령 (단축키, 툴바 버튼이 함께 쓴다).
  */
-import { clipEnd, defaultTrackFor, findClip } from './model/ops';
+import { clipEnd, createMediaClip, defaultTrackFor, findClip, trackKindFor } from './model/ops';
 import type { Clip, EditState, Ratio } from './model/types';
 import { history } from './store/history';
 import { useProject } from './store/project';
@@ -68,5 +68,19 @@ export const actions = {
   },
   setRatio(ratio: Ratio): void {
     useProject.getState().setRatio(ratio);
+  },
+  /**
+   * 미디어를 타임라인에 넣는다 (R4.5). 트랙을 주지 않으면 기본 트랙(영상/이미지 → 메인 영상 트랙),
+   * 위치를 주지 않으면 플레이헤드. 겹치면 가장 가까운 빈 구간. 종류가 맞지 않는 트랙이면 넣지 않는다.
+   */
+  addAssetToTimeline(assetId: string, trackId?: string, frame?: number): string | null {
+    const p = useProject.getState();
+    const asset = p.assets[assetId];
+    if (!asset) return null;
+    const track = trackId ? p.edit.tracks.find((t) => t.id === trackId) : defaultTrackFor(p.edit, asset.kind);
+    if (!track || track.kind !== trackKindFor(asset.kind)) return null;
+    const id = p.addClip(track.id, createMediaClip(asset, frame ?? useUI.getState().playhead));
+    if (id) useUI.getState().select(id);
+    return id;
   },
 };

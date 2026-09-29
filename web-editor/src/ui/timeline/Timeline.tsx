@@ -1,20 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
 import { actions } from '../../actions';
 import { ko, withKey } from '../../i18n/ko';
+import { trackKindFor } from '../../model/ops';
+import { snapCandidates, snapValue, SNAP_THRESHOLD_PX } from '../../model/snap';
 import { editDuration } from '../../model/time';
 import type { Track } from '../../model/types';
 import { useProject } from '../../store/project';
 import { clampZoom, useUI } from '../../store/ui';
 import { IconButton } from '../common';
-import { IconFilm, IconMagnet, IconMusic, IconScissors, IconTrash, IconType, IconVolume, IconVolumeOff, IconZoomIn, IconZoomOut } from '../icons';
+import {
+  IconFilm,
+  IconMagnet,
+  IconMusic,
+  IconPlus,
+  IconScissors,
+  IconTrash,
+  IconType,
+  IconVolume,
+  IconVolumeOff,
+  IconZoomIn,
+  IconZoomOut,
+} from '../icons';
+import { ASSET_DRAG_TYPE } from '../MediaPanel';
+import { ClipView } from './ClipView';
 import { HEADER_W, ROW_H, RULER_H, SLIDER_MAX, TAIL_FRAMES, sliderToZoom, zoomToSlider } from './layout';
 import { Ruler } from './Ruler';
+import { assetDrag, useTimelineView } from './view';
 
 function Toolbar() {
   const snap = useUI((s) => s.snap);
   const ppf = useUI((s) => s.pxPerFrame);
   const selected = useUI((s) => s.selectedClipId);
   const zoomBy = (f: number) => useUI.getState().setZoom(clampZoom(useUI.getState().pxPerFrame * f));
+  const addTrack = (kind: 'video' | 'audio') => useProject.getState().addTrack(kind);
   return (
     <div className="flex h-10 shrink-0 items-center gap-1 border-b border-neutral-800 px-2">
       <IconButton label={ko.timeline.split} tooltip={withKey(ko.timeline.split, ko.keys.split)} onClick={actions.splitAtPlayhead} testId="split">
@@ -29,13 +47,22 @@ function Toolbar() {
       >
         <IconTrash />
       </IconButton>
+      <div className="mx-1 h-5 w-px bg-neutral-800" />
+      <IconButton label={ko.timeline.addVideoTrack} onClick={() => addTrack('video')} testId="add-video-track">
+        <IconPlus />
+        <span className="text-xs">{ko.timeline.videoTrackShort}</span>
+      </IconButton>
+      <IconButton label={ko.timeline.addAudioTrack} onClick={() => addTrack('audio')} testId="add-audio-track">
+        <IconPlus />
+        <span className="text-xs">{ko.timeline.audioTrackShort}</span>
+      </IconButton>
       <div className="flex-1" />
       <IconButton label={ko.timeline.snap} pressed={snap} onClick={() => useUI.getState().setSnap(!snap)} testId="snap">
         <IconMagnet />
         <span className="text-xs">{ko.timeline.snap}</span>
       </IconButton>
       <div className="mx-1 h-5 w-px bg-neutral-800" />
-      <IconButton label={ko.timeline.zoomOut} onClick={() => zoomBy(1 / 1.5)}>
+      <IconButton label={ko.timeline.zoomOut} onClick={() => zoomBy(1 / 1.5)} testId="zoom-out">
         <IconZoomOut />
       </IconButton>
       <input
@@ -48,7 +75,7 @@ function Toolbar() {
         onChange={(e) => useUI.getState().setZoom(sliderToZoom(Number(e.target.value)))}
         className="w-32 accent-cyan-400"
       />
-      <IconButton label={ko.timeline.zoomIn} onClick={() => zoomBy(1.5)}>
+      <IconButton label={ko.timeline.zoomIn} onClick={() => zoomBy(1.5)} testId="zoom-in">
         <IconZoomIn />
       </IconButton>
     </div>
@@ -80,15 +107,49 @@ function TrackHeader({ track }: { track: Track }) {
   );
 }
 
-function TrackLane({ track, width }: { track: Track; width: number }) {
+/** 끌고 있는 미디어가 이 트랙에 들어갈 수 있는지 (R4.5) */
+function acceptsDraggedAsset(track: Track, id: string | null): boolean {
+  const asset = id ? useProject.getState().assets[id] : undefined;
+  return !!asset && trackKindFor(asset.kind) === track.kind;
+}
+
+function TrackLane({ track, width, scroller }: { track: Track; width: number; scroller: HTMLDivElement | null }) {
+  const [dropping, setDropping] = useState(false);
+  const onDragOver = (e: DragEvent) => {
+    if (!acceptsDraggedAsset(track, assetDrag.id)) return; // 기본 동작을 막지 않으면 "놓을 수 없음" 커서
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDropping(true);
+  };
+  const onDrop = (e: DragEvent) => {
+    const id = assetDrag.id ?? e.dataTransfer.getData(ASSET_DRAG_TYPE);
+    setDropping(false);
+    if (!acceptsDraggedAsset(track, id)) return;
+    e.preventDefault();
+    const { pxPerFrame: z, snap, playhead } = useUI.getState();
+    let frame = Math.max(0, Math.round((e.clientX - e.currentTarget.getBoundingClientRect().left) / z));
+    if (snap) frame = snapValue(frame, snapCandidates(useProject.getState().edit, null, playhead), SNAP_THRESHOLD_PX / z).value;
+    actions.addAssetToTimeline(id, track.id, frame);
+    assetDrag.id = null;
+  };
   return (
     <div
       data-testid="track-lane"
       data-track-id={track.id}
       data-kind={track.kind}
-      className="relative shrink-0 border-b border-neutral-800 bg-neutral-950/60"
+      className={'relative shrink-0 border-b border-neutral-800 ' + (dropping ? 'bg-cyan-500/10' : 'bg-neutral-950/60')}
       style={{ width, height: ROW_H[track.kind] }}
-    />
+      onDragOver={onDragOver}
+      onDragLeave={() => setDropping(false)}
+      onDrop={onDrop}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) useUI.getState().select(null);
+      }}
+    >
+      {track.clips.map((c) => (
+        <ClipView key={c.id} clip={c} rowKind={track.kind} scroller={scroller} />
+      ))}
+    </div>
   );
 }
 
@@ -106,6 +167,55 @@ function Playhead({ height }: { height: number }) {
   );
 }
 
+function SnapLine({ height }: { height: number }) {
+  const line = useTimelineView((s) => s.snapLine);
+  const ppf = useUI((s) => s.pxPerFrame);
+  if (line === null) return null;
+  return (
+    <div
+      data-testid="snap-line"
+      className="pointer-events-none absolute top-0 z-10 w-px bg-yellow-300"
+      style={{ height, transform: `translateX(${HEADER_W + line * ppf}px)` }}
+    />
+  );
+}
+
+/** 줌할 때 기준점(커서 또는 플레이헤드)이 화면에서 제자리에 있도록 스크롤을 맞춘다 */
+function useZoomAnchor(scroller: HTMLDivElement | null, ppf: number) {
+  const anchor = useRef<{ frame: number; screenX: number } | null>(null);
+  const prev = useRef(ppf);
+  useLayoutEffect(() => {
+    const el = scroller;
+    const old = prev.current;
+    prev.current = ppf;
+    if (!el || old === ppf) return;
+    let a = anchor.current;
+    anchor.current = null;
+    if (!a) {
+      const ph = useUI.getState().playhead;
+      const phX = ph * old - el.scrollLeft;
+      a = phX >= 0 && phX <= el.clientWidth - HEADER_W ? { frame: ph, screenX: phX } : { frame: el.scrollLeft / old, screenX: 0 };
+    }
+    el.scrollLeft = Math.max(0, a.frame * ppf - a.screenX);
+  }, [scroller, ppf]);
+
+  // Ctrl+휠: 커서 위치 기준 확대/축소 (R5.7). 브라우저 확대를 막으려면 passive: false여야 한다.
+  useEffect(() => {
+    const el = scroller;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const screenX = Math.max(0, e.clientX - el.getBoundingClientRect().left - HEADER_W);
+      const z = useUI.getState().pxPerFrame;
+      anchor.current = { frame: (el.scrollLeft + screenX) / z, screenX };
+      useUI.getState().setZoom(clampZoom(z * Math.exp(-e.deltaY * 0.0015)));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [scroller]);
+}
+
 export function Timeline() {
   const tracks = useProject((s) => s.edit.tracks);
   const duration = useProject((s) => editDuration(s.edit));
@@ -113,12 +223,33 @@ export function Timeline() {
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [viewW, setViewW] = useState(0);
 
+  // 스크롤 위치/보이는 너비 → 클립 캔버스가 보이는 부분만 그리는 데 쓴다
   useEffect(() => {
-    if (!scroller) return;
-    const ro = new ResizeObserver(() => setViewW(scroller.clientWidth));
-    ro.observe(scroller);
-    return () => ro.disconnect();
+    const el = scroller;
+    if (!el) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      useTimelineView.getState().set({ scrollLeft: el.scrollLeft, viewW: el.clientWidth - HEADER_W });
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    const ro = new ResizeObserver(() => {
+      setViewW(el.clientWidth);
+      update();
+    });
+    ro.observe(el);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    update();
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      el.removeEventListener('scroll', onScroll);
+    };
   }, [scroller]);
+
+  useZoomAnchor(scroller, ppf);
 
   const laneWidth = Math.max(viewW - HEADER_W, Math.ceil((duration + TAIL_FRAMES) * ppf));
   const contentH = RULER_H + tracks.reduce((h, t) => h + ROW_H[t.kind], 0);
@@ -135,9 +266,10 @@ export function Timeline() {
           {tracks.map((t) => (
             <div key={t.id} className="flex">
               <TrackHeader track={t} />
-              <TrackLane track={t} width={laneWidth} />
+              <TrackLane track={t} width={laneWidth} scroller={scroller} />
             </div>
           ))}
+          <SnapLine height={contentH} />
           <Playhead height={contentH} />
         </div>
       </div>
