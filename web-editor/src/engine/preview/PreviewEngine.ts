@@ -519,6 +519,15 @@ export class PreviewEngine {
     return null;
   }
 
+  /**
+   * 이 클립에 지금 걸려 있는 소리 크기(GainNode 값). 없으면 null.
+   * 미리보기가 정말 gainAt 곡선을 쓰는지 테스트로 확인하는 데 쓴다 (R8.4).
+   */
+  clipGain(clipId: string): number | null {
+    const g = this.slots.get(clipId)?.audio?.gain;
+    return g ? g.gain.value : null;
+  }
+
   stats(): PreviewStats {
     let maxGap = 0;
     for (let i = 1; i < this.draws.length; i++) maxGap = Math.max(maxGap, this.draws[i] - this.draws[i - 1]);

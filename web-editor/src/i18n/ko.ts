@@ -170,6 +170,8 @@ export const ko = {
     zoomOut: '축소',
     mute: '음소거',
     unmute: '음소거 해제',
+    fadeInHandle: '페이드 인 길이 조절',
+    fadeOutHandle: '페이드 아웃 길이 조절',
     ruler: '시간 눈금',
     addVideoTrack: '영상 트랙 추가',
     addAudioTrack: '오디오 트랙 추가',

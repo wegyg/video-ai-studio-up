@@ -56,6 +56,7 @@ export const debugApi: EditorDebugApi = {
     derivedKeys: (await (await db()).getAllKeys('derived')).map(String),
   }),
   preview: () => previewRef.current?.stats() ?? null,
+  clipGain: (clipId) => previewRef.current?.clipGain(clipId) ?? null,
   clipBox: (clipId) => {
     const id = clipId ?? useUI.getState().selectedClipId;
     return id ? (previewRef.current?.boxOf(id) ?? null) : null;

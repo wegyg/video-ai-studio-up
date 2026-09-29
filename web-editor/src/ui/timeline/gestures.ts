@@ -3,7 +3,7 @@
  * 드래그 한 번 = 실행 취소 기록 1개 (history.beginGesture/endGesture). Esc로 취소.
  * 위치는 "누른 지점의 트랙 좌표"와 "지금 트랙 좌표"의 차이로 계산한다 → 자동 스크롤해도 어긋나지 않는다.
  */
-import { clipEnd, findClip, trackKindFor } from '../../model/ops';
+import { clipEnd, findClip, isMedia, trackKindFor } from '../../model/ops';
 import { snapCandidates, snapRange, snapValue, SNAP_THRESHOLD_PX } from '../../model/snap';
 import type { Clip } from '../../model/types';
 import { history } from '../../store/history';
@@ -12,7 +12,7 @@ import { useUI } from '../../store/ui';
 import { HEADER_W } from './layout';
 import { useTimelineView } from './view';
 
-export type GestureKind = 'move' | 'trim-start' | 'trim-end';
+export type GestureKind = 'move' | 'trim-start' | 'trim-end' | 'fade-in' | 'fade-out';
 
 const EDGE = 40; // 이 거리 안이면 자동 스크롤
 const MOVE_SLOP = 3; // 이만큼 움직여야 이동 시작 (클릭과 구분)
@@ -46,6 +46,7 @@ export function startClipGesture(e: PointerEvent | React.PointerEvent, clipId: s
   const candidates = snapCandidates(useProject.getState().edit, clipId, useUI.getState().playhead);
   const wantKind = trackKindFor(clip.type);
 
+  // 이동만 살짝 움직여야 시작한다 (클릭과 구분). 트림·페이드는 바로 시작
   let started = kind !== 'move';
   let lastX = e.clientX;
   let lastY = e.clientY;
@@ -69,6 +70,13 @@ export function startClipGesture(e: PointerEvent | React.PointerEvent, clipId: s
       const lane = lanes.find((l) => lastY >= l.top && lastY < l.bottom && l.kind === wantKind);
       const cur = findClip(p.edit, clipId);
       p.moveClip(clipId, lane?.id ?? cur?.track.id ?? loc.track.id, start);
+    } else if (kind === 'fade-in' || kind === 'fade-out') {
+      // 페이드 인 핸들은 오른쪽으로, 페이드 아웃 핸들은 왼쪽으로 끌면 길어진다 (R8.2)
+      if (!isMedia(clip)) return;
+      const key = kind === 'fade-in' ? 'fadeIn' : 'fadeOut';
+      const start = kind === 'fade-in' ? clip.fadeIn : clip.fadeOut;
+      const next = Math.max(0, Math.min(clip.duration, start + (kind === 'fade-in' ? dFrames : -dFrames)));
+      p.updateClip(clipId, (c) => (isMedia(c) ? { ...c, [key]: next } : c));
     } else {
       const edge = kind === 'trim-start' ? 'start' : 'end';
       let frame = (edge === 'start' ? clip.start : clipEnd(clip)) + dFrames;

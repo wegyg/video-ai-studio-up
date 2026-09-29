@@ -97,6 +97,8 @@ export interface EditorDebugApi {
   previewPixel: (fx?: number, fy?: number) => number[];
   /** 선택한(또는 지정한) 클립이 미리보기에서 놓인 사각형 — 프로젝트 좌표 */
   clipBox: (clipId?: string) => { cx: number; cy: number; w: number; h: number; rotation: number } | null;
+  /** 미리보기가 이 클립에 적용 중인 소리 크기 (GainNode 값) */
+  clipGain: (clipId: string) => number | null;
   [key: string]: unknown;
 }
 

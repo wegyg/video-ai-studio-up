@@ -3,6 +3,7 @@
  * 긴 클립도 가볍게: 캔버스는 화면에 보이는 부분만 그린다.
  */
 import { memo, useLayoutEffect, useRef } from 'react';
+import { ko } from '../../i18n/ko';
 import { PEAKS_PER_SEC } from '../../media/derive-protocol';
 import { useMedia, type Filmstrip } from '../../media/store';
 import { FPS, type Clip, type MediaClip } from '../../model/types';
@@ -80,10 +81,72 @@ function ClipCanvas({ clip, width, height }: { clip: MediaClip; width: number; h
   return <canvas ref={ref} className="pointer-events-none absolute top-0" style={{ left: visL, width: w, height }} />;
 }
 
+/**
+ * 페이드 인/아웃 표시와 핸들 (R8.2).
+ * 어두운 삼각형이 소리가 작아지는 구간이고, 위쪽 동그라미를 끌어 길이를 바꾼다.
+ */
+function FadeOverlay({
+  clip,
+  ppf,
+  width,
+  selected,
+  onBegin,
+}: {
+  clip: MediaClip;
+  ppf: number;
+  width: number;
+  selected: boolean;
+  onBegin: (kind: GestureKind) => (e: React.PointerEvent) => void;
+}) {
+  const inW = clip.fadeIn * ppf;
+  const outW = clip.fadeOut * ppf;
+  // 핸들은 클립 안쪽에 둔다. 경계에 걸치면 overflow-hidden에 잘려 잡히지 않는다
+  const INSET = 7;
+  const clampX = (x: number) => Math.min(Math.max(x, INSET), Math.max(INSET, width - INSET));
+  const handle =
+    'absolute top-0 z-[2] size-3 -translate-x-1/2 cursor-ew-resize rounded-full border border-neutral-900 bg-amber-300 ' +
+    (selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100');
+  return (
+    <>
+      {inW > 1 && (
+        <div
+          data-testid="fade-in-ramp"
+          className="pointer-events-none absolute inset-y-0 left-0 bg-black/55"
+          style={{ width: inW, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}
+        />
+      )}
+      {outW > 1 && (
+        <div
+          data-testid="fade-out-ramp"
+          className="pointer-events-none absolute inset-y-0 right-0 bg-black/55"
+          style={{ width: outW, clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}
+        />
+      )}
+      <div
+        data-testid="fade-in-handle"
+        title={ko.timeline.fadeInHandle}
+        aria-label={ko.timeline.fadeInHandle}
+        onPointerDown={onBegin('fade-in')}
+        className={handle}
+        style={{ left: clampX(inW) }}
+      />
+      <div
+        data-testid="fade-out-handle"
+        title={ko.timeline.fadeOutHandle}
+        aria-label={ko.timeline.fadeOutHandle}
+        onPointerDown={onBegin('fade-out')}
+        className={handle}
+        style={{ left: clampX(width - outW) }}
+      />
+    </>
+  );
+}
+
 export const ClipView = memo(function ClipView({ clip, rowKind, scroller }: { clip: Clip; rowKind: keyof typeof ROW_H; scroller: HTMLDivElement | null }) {
   const ppf = useUI((s) => s.pxPerFrame);
   const selected = useUI((s) => s.selectedClipId === clip.id);
   const assetName = useProject((s) => (clip.type === 'text' ? '' : (s.assets[clip.assetId]?.name ?? '')));
+  const hasAudio = useProject((s) => (clip.type === 'text' ? false : (s.assets[clip.assetId]?.hasAudio ?? false)));
   const posterUrl = useMedia((s) => (clip.type === 'image' ? s.entries[clip.assetId]?.posterUrl : undefined));
   const width = Math.max(2, clip.duration * ppf);
   const height = ROW_H[rowKind] - PAD_Y * 2;
@@ -103,7 +166,7 @@ export const ClipView = memo(function ClipView({ clip, rowKind, scroller }: { cl
       data-selected={selected}
       onPointerDown={begin('move')}
       className={
-        'absolute cursor-grab overflow-hidden rounded-md ring-1 active:cursor-grabbing ' +
+        'group absolute cursor-grab overflow-hidden rounded-md ring-1 active:cursor-grabbing ' +
         TYPE_STYLE[clip.type] +
         (selected ? ' z-[5] ring-2 ring-white' : '')
       }
@@ -121,6 +184,16 @@ export const ClipView = memo(function ClipView({ clip, rowKind, scroller }: { cl
       <span className="pointer-events-none absolute top-0.5 left-2 max-w-[calc(100%-1rem)] truncate rounded bg-black/40 px-1 text-[10px] text-white/90">
         {clip.type === 'text' ? clip.text : assetName}
       </span>
+      {hasAudio && clip.type !== 'text' && clip.volume !== 1 && (
+        <span
+          data-testid="clip-volume-badge"
+          className="pointer-events-none absolute right-2 bottom-0.5 rounded bg-black/60 px-1 text-[10px] tabular-nums text-amber-200"
+        >
+          {Math.round(clip.volume * 100)}
+          {ko.inspector.units.percent}
+        </span>
+      )}
+      {hasAudio && <FadeOverlay clip={clip as MediaClip} ppf={ppf} width={width} selected={selected} onBegin={begin} />}
       <div
         data-testid="trim-start"
         onPointerDown={begin('trim-start')}
