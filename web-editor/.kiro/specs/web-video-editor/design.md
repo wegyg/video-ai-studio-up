@@ -253,6 +253,10 @@ VideoEncoder 있음 && canEncodeVideo('avc', {width,height,frameRate:30, bitrate
 - 덕킹 곡선: 프레임마다 "다른 소리 있음" = 덕킹하지 않는 소리 나는 클립 중 하나라도 (원본 피크 × gainAt) > 0.05. 6프레임 앞당겨 1로, 끝나면 15프레임에 걸쳐 0으로. 덕킹 클립 크기 = gainAt × (1 − 곡선 × (1 − duck)). 피크는 가져올 때 만든 파형(초당 100개)이라 미리보기와 내보내기가 같은 값을 본다.
 - 오디오 분리: 새 `audio` 클립이 같은 원본(영상 파일)을 가리킨다. 미리보기는 `<audio>`로 영상 파일의 소리를 틀고, 내보내기는 영상 파일의 오디오 트랙을 디코딩한다. 영상 클립의 `audioDetached`가 켜지면 그 클립은 소리를 내지 않는다.
 
+### 영상 효과 (2-7, `model/effects.ts`)
+- 클립의 `effects = [{ kind, intensity }]`. 셰이더 `FS_FILTER`가 색 조정과 함께 처리한다: 표본 위치(줌 펄스·흔들림, 가장자리가 보이지 않게 조금 확대) → 블러(프로젝트 기준 반경, 밉맵) → 색 조정 → 흑백·레트로 → 번쩍임 → 비네트.
+- 시간 효과는 `t = (프레임 − 클립 시작) / 30`으로만 정해지므로 미리보기와 내보내기가 같은 프레임에 같은 값을 쓴다.
+
 ### 원본 색 해석 맞추기 (`media/color.ts`)
 미리보기는 `<video>`가, 내보내기는 WebCodecs(Mediabunny)가 원본을 푼다. 원본에 색 정보(primaries·transfer·matrix)가 셋 다 있지 않으면:
 - Chrome `<video>`: 모두 버리고 세로(natural) 720 미만은 BT.601, 이상은 BT.709로 가정 (Chromium `media/ffmpeg/ffmpeg_common.cc`, VP9·AV1 제외)

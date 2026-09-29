@@ -6,6 +6,7 @@ import { toast } from './ui/toasts';
 import { clipEnd, createMediaClip, createShapeClip, createTextClip, DEFAULT_TRANSFORM, defaultTrackFor, findClip, isMedia, newId, trackKindFor } from './model/ops';
 import { NEUTRAL_ADJUST, presetFilter } from './model/filters';
 import { keyOffsets, setEaseAt, setValues, toggleKeys, TRANSFORM_PROPS } from './model/keyframes';
+import { setEffectIntensity, TIME_VARYING, toggleEffect } from './model/effects';
 import {
   cutsOf,
   maxTransitionFrames,
@@ -14,7 +15,7 @@ import {
   transitionInto,
   type Cut,
 } from './model/transitions';
-import { RATIO_SIZE, type AssetMeta, type Clip, type ColorAdjust, type EditState, type Easing, type KeyProp, type MediaClip, type Ratio, type ShapeKind, type TextStyle, type Track, type TransitionKind } from './model/types';
+import { RATIO_SIZE, type AssetMeta, type Clip, type ColorAdjust, type EditState, type Easing, type KeyProp, type MediaClip, type Ratio, type ShapeKind, type TextStyle, type Track, type TransitionKind, type VideoEffectKind } from './model/types';
 import { SAFE_AREA } from './engine/text';
 import { history } from './store/history';
 import { useProject } from './store/project';
@@ -309,6 +310,37 @@ export const actions = {
       else next.duck = Math.max(0, Math.min(1, duck));
       return next;
     });
+  },
+  /**
+   * 영상 효과 켜기/끄기 (R15, 고른 영상·이미지 클립). 움직이는 효과는 켜자마자 1.5초 재생해 보여 주고(G1),
+   * 멈춘 효과는 결과가 보이도록 플레이헤드를 클립 안으로 옮긴다.
+   */
+  toggleVideoEffect(kind: VideoEffectKind): boolean {
+    const id = useUI.getState().selectedClipId;
+    const loc = id ? findClip(useProject.getState().edit, id) : null;
+    if (!loc || (loc.clip.type !== 'video' && loc.clip.type !== 'image')) return false;
+    useProject.getState().updateClip(loc.clip.id, (c) => (isMedia(c) ? toggleEffect(c, kind) : c));
+    const now = findClip(useProject.getState().edit, loc.clip.id)?.clip;
+    const on = !!now && isMedia(now) && !!now.effects?.some((e) => e.kind === kind);
+    if (on && TIME_VARYING.has(kind)) actions.previewClip(loc.clip.id);
+    else actions.revealClip(loc.clip.id);
+    return true;
+  },
+  setVideoEffectIntensity(kind: VideoEffectKind, intensity: number): void {
+    const id = useUI.getState().selectedClipId;
+    if (id) useProject.getState().updateClip(id, (c) => (isMedia(c) ? setEffectIntensity(c, kind, intensity) : c));
+  },
+  /** 클립을 지금 위치(클립 밖이면 시작)부터 1.5초 재생해 보여 주고 그 위치로 돌아온다 */
+  previewClip(clipId: string): void {
+    const loc = findClip(useProject.getState().edit, clipId);
+    if (!loc) return;
+    const c = loc.clip;
+    const ui = useUI.getState();
+    const from = ui.playhead >= c.start && ui.playhead < clipEnd(c) - 1 ? ui.playhead : c.start;
+    if (ui.playing) ui.setPlaying(false);
+    ui.setPlayhead(from);
+    ui.setPlayRange({ end: Math.min(clipEnd(c), from + 45), returnTo: from });
+    ui.setPlaying(true);
   },
   /** 화면 배치 초기화: 배치 키프레임도 지운다 */
   resetTransform(clipId: string): void {

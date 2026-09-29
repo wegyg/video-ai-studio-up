@@ -90,6 +90,14 @@ export interface ClipFilter {
  */
 export type CanvasBackground = { kind: 'color'; color: string } | { kind: 'blur'; amount: number };
 
+/** 영상 효과 종류 (R15) */
+export type VideoEffectKind = 'shake' | 'flash' | 'zoom-pulse' | 'mono' | 'retro' | 'blur';
+export interface VideoEffect {
+  kind: VideoEffectKind;
+  /** 강도 0~100 */
+  intensity: number;
+}
+
 /** 트랜지션 종류 (R14). 슬라이드는 화면이 움직이는 방향별로 하나씩, 줌은 인·아웃 따로 */
 export type TransitionKind =
   | 'dissolve'
@@ -118,6 +126,8 @@ export interface MediaClip extends ClipBase {
   assetId: string;
   /** 필터·조정 (영상·이미지만). 없으면 원본 그대로 — 예전에 저장한 프로젝트에는 이 값이 없다 */
   filter?: ClipFilter;
+  /** 영상 효과 (영상·이미지만). 없으면 효과 없음 */
+  effects?: VideoEffect[];
   /** 앞 클립에서 넘어오는 트랜지션 (영상·이미지만). 없으면 바로 바뀐다 */
   transitionIn?: Transition;
   /** 원본에서의 시작 프레임 (이미지는 항상 0). 속도가 1이 아니면 소수일 수 있다 */

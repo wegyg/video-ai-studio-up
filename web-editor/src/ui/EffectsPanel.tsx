@@ -10,7 +10,8 @@ import { useMedia } from '../media/store';
 import { ADJUST_KEYS, ADJUST_RANGE, DEFAULT_BACKGROUND, DEFAULT_BLUR_AMOUNT, FILTER_PRESETS, NEUTRAL_ADJUST } from '../model/filters';
 import { findClip, isMedia } from '../model/ops';
 import { TRANSITION_KINDS } from '../model/transitions';
-import type { ColorAdjust, MediaClip, TransitionKind } from '../model/types';
+import { VIDEO_EFFECTS } from '../model/effects';
+import type { ColorAdjust, MediaClip, TransitionKind, VideoEffectKind } from '../model/types';
 import { useProject } from '../store/project';
 import { useUI } from '../store/ui';
 import { ColorField, SliderField } from './fields';
@@ -294,6 +295,95 @@ function TransitionSection() {
   );
 }
 
+/** 영상 효과 아이콘 */
+function FxIcon({ kind }: { kind: VideoEffectKind }) {
+  const c = '#22d3ee';
+  return (
+    <svg viewBox="0 0 40 28" className="h-full w-full" aria-hidden="true">
+      <rect x="0" y="0" width="40" height="28" fill="#404040" />
+      {kind === 'shake' && (
+        <>
+          <rect x="9" y="6" width="22" height="16" fill="none" stroke="#737373" strokeWidth="1.5" />
+          <rect x="12" y="4" width="22" height="16" fill="none" stroke={c} strokeWidth="2" />
+        </>
+      )}
+      {kind === 'flash' && <polygon points="22,3 11,16 19,16 16,25 29,11 21,11" fill="#fde047" />}
+      {kind === 'zoom-pulse' && (
+        <>
+          <rect x="13" y="9" width="14" height="10" fill={c} />
+          <rect x="7" y="5" width="26" height="18" fill="none" stroke={c} strokeWidth="1.5" strokeDasharray="3 2" />
+        </>
+      )}
+      {kind === 'mono' && (
+        <>
+          <rect x="0" y="0" width="20" height="28" fill="#d4d4d4" />
+          <rect x="20" y="0" width="20" height="28" fill="#262626" />
+        </>
+      )}
+      {kind === 'retro' && <rect x="4" y="4" width="32" height="20" rx="3" fill="#b08850" />}
+      {kind === 'blur' && (
+        <>
+          <circle cx="20" cy="14" r="9" fill={c} opacity="0.35" />
+          <circle cx="20" cy="14" r="5" fill={c} opacity="0.6" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/** 영상 효과 6종: 고른 클립에 켜고 끄기 + 켠 효과의 강도 */
+function VideoFxSection() {
+  const clip = useSelectedVisual();
+  if (!clip) {
+    return (
+      <Section title={ko.effects.sectionVideoFx}>
+        <p className="rounded-md bg-neutral-800 px-3 py-3 text-center text-xs leading-relaxed text-neutral-400">{ko.effects.filterHint}</p>
+      </Section>
+    );
+  }
+  return (
+    <Section title={ko.effects.sectionVideoFx} hint={ko.effects.videoFxHint}>
+      <div className="mb-2 grid grid-cols-3 gap-2" data-testid="video-fx-list">
+        {VIDEO_EFFECTS.map((k) => {
+          const on = !!clip.effects?.some((e) => e.kind === k);
+          const label = ko.effects.videoFx[k] ?? k;
+          return (
+            <button
+              key={k}
+              type="button"
+              data-testid="video-fx"
+              data-kind={k}
+              aria-pressed={on}
+              aria-label={label}
+              title={label}
+              onClick={() => actions.toggleVideoEffect(k)}
+              className={'flex flex-col overflow-hidden rounded-md bg-neutral-800 ring-1 ' + (on ? 'ring-2 ring-cyan-400' : 'ring-neutral-700/60 hover:ring-cyan-500')}
+            >
+              <span className="block aspect-[10/7] w-full">
+                <FxIcon kind={k} />
+              </span>
+              <span className="truncate px-1 py-0.5 text-center text-[10px] text-neutral-300">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-col gap-2">
+        {clip.effects?.map((e) => (
+          <SliderField
+            key={e.kind}
+            label={ko.effects.videoFx[e.kind] ?? e.kind}
+            testId={`fx-intensity-${e.kind}`}
+            value={e.intensity}
+            min={0}
+            max={100}
+            onCommit={(v) => actions.setVideoEffectIntensity(e.kind, v)}
+          />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 export function EffectsPanel() {
   if (!effectsSupported()) {
     return (
@@ -306,6 +396,7 @@ export function EffectsPanel() {
     <div data-testid="effects-panel">
       <BackgroundSection />
       <TransitionSection />
+      <VideoFxSection />
       <FilterSection />
     </div>
   );

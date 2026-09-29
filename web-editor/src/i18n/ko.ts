@@ -206,6 +206,17 @@ export const ko = {
     },
     resetAdjust: '조정 초기화',
     sectionTransition: '트랜지션',
+    sectionVideoFx: '영상 효과',
+    videoFxHint: '클립을 고른 뒤 누르면 켜지고 다시 누르면 꺼집니다. 움직이는 효과는 켜자마자 잠깐 재생해 보여 줍니다.',
+    videoFx: {
+      shake: '흔들림',
+      flash: '번쩍임',
+      'zoom-pulse': '줌 펄스',
+      mono: '흑백',
+      retro: '레트로',
+      blur: '블러',
+    } as Record<string, string>,
+    fxIntensity: (name: string) => `${name} 강도`,
     transitionHint: '두 클립이 맞닿은 곳(타임라인)에 끌어다 놓거나, 클립을 고른 뒤 누르세요. 누르면 바로 한 번 재생해 보여 줍니다.',
     transitions: {
       dissolve: '디졸브',

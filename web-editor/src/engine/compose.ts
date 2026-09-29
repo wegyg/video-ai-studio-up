@@ -4,10 +4,11 @@
  * 순서: 배경(단색 또는 흐림) → 영상 트랙 아래→위 (필터·트랜지션은 WebGL 셰이더) → 텍스트 트랙(항상 맨 앞).
  * 트랜지션 구간에서는 두 클립을 각자 배치·필터까지 그린 장면 두 장을 만든 뒤 셰이더로 섞는다.
  */
-import { clipAdjust, DEFAULT_BACKGROUND } from '../model/filters';
+import { clipAdjust, DEFAULT_BACKGROUND, NEUTRAL_ADJUST } from '../model/filters';
+import { clipEffects, type EffectParams } from '../model/effects';
 import { clipAtFrame } from '../model/keyframes';
 import { TRANSITION_KINDS, visualAt } from '../model/transitions';
-import { RATIO_SIZE, type ColorAdjust, type Clip, type EditState, type MediaClip, type ShapeClip, type TextClip, type Track, type Transform } from '../model/types';
+import { FPS, RATIO_SIZE, type ColorAdjust, type Clip, type EditState, type MediaClip, type ShapeClip, type TextClip, type Track, type Transform } from '../model/types';
 
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -34,8 +35,8 @@ export interface EffectImage {
 
 /** WebGL 효과 처리기 (src/engine/gl/effects.ts). 미리보기와 내보내기가 같은 구현을 쓴다 */
 export interface Effects {
-  /** 색 조정. 결과는 outW×outH (다음 호출 전에 바로 그려야 한다) */
-  filter(image: CanvasImageSource, adjust: ColorAdjust, outW: number, outH: number, pxScale: number): EffectImage | null;
+  /** 색 조정 + 영상 효과(없으면 null). 결과는 outW×outH (다음 호출 전에 바로 그려야 한다) */
+  filter(image: CanvasImageSource, adjust: ColorAdjust, outW: number, outH: number, pxScale: number, fx?: EffectParams | null): EffectImage | null;
   /** 흐림 배경: image를 W×H에 꽉 차게 깔고 흐리게 한 그림 */
   blurFill(image: CanvasImageSource, adjust: ColorAdjust | null, W: number, H: number, amount: number): EffectImage | null;
   /** 트랜지션: 같은 크기(w×h)의 두 장면을 섞는다. kind = TRANSITION_KINDS 번호, progress 0~1 */
@@ -145,13 +146,14 @@ function drawShape(ctx: Ctx2D, c: ShapeClip, W: number, H: number): void {
 }
 
 /** 클립 하나를 배치대로 그린다 (필터가 있으면 셰이더를 거쳐서) */
-function drawPart(ctx: Ctx2D, part: Part, W: number, H: number, fx: Effects | null, pxScale: number): void {
+function drawPart(ctx: Ctx2D, part: Part, W: number, H: number, fx: Effects | null, pxScale: number, frame: number): void {
   const { clip, src } = part;
   let s = src;
   const adjust = fx ? clipAdjust(clip) : null;
-  if (adjust && fx) {
+  const vfx = fx ? clipEffects(clip, frame, FPS) : null; // 영상 효과 (model/effects.ts)
+  if ((adjust || vfx) && fx) {
     const { w, h } = baseSize(src.width, src.height, W, H);
-    const out = fx.filter(src.image, adjust, w * clip.transform.scale * pxScale, h * clip.transform.scale * pxScale, pxScale);
+    const out = fx.filter(src.image, adjust ?? NEUTRAL_ADJUST, w * clip.transform.scale * pxScale, h * clip.transform.scale * pxScale, pxScale, vfx);
     if (out) s = { ...src, image: out.image, sx: out.sx, sy: out.sy, sw: out.sw, sh: out.sh };
   }
   drawVisual(ctx, s, clip.transform, W, H);
@@ -215,7 +217,7 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
 
   for (const layer of layers) {
     if ('one' in layer) {
-      drawPart(ctx, layer.one, W, H, fx, pxScale);
+      drawPart(ctx, layer.one, W, H, fx, pxScale, frame);
       continue;
     }
     if ('shape' in layer) {
@@ -230,7 +232,7 @@ export function drawFrame(ctx: Ctx2D, edit: EditState, frame: number, sources: F
       sc.ctx.setTransform(1, 0, 0, 1, 0, 0);
       sc.ctx.clearRect(0, 0, lw, lh);
       sc.ctx.setTransform(lw / W, 0, 0, lh / H, 0, 0);
-      if (part) drawPart(sc.ctx, part, W, H, fx, pxScale);
+      if (part) drawPart(sc.ctx, part, W, H, fx, pxScale, frame);
       return sc.canvas;
     };
     const a = paint(0, layer.from);

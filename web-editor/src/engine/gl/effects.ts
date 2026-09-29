@@ -10,6 +10,7 @@
  *   곧바로 그 부분을 drawImage로 가져간다.
  * - `adjustPixel`(src/model/filters.ts)이 FS_FILTER와 같은 계산을 한다. 둘 중 하나를 고치면 다른 쪽도 고친다.
  */
+import type { EffectParams } from '../../model/effects';
 import type { ColorAdjust } from '../../model/types';
 import type { EffectImage, Effects } from '../compose';
 
@@ -40,14 +41,50 @@ uniform float u_sharpPx;
 uniform vec4 u_adj;   // 밝기, 대비, 채도, 색온도 (-1~1)
 uniform float u_sharp; // 0~1
 uniform float u_vig;   // 0~1
+uniform vec4 u_fx1;    // 영상 효과 강도(0~1): 흔들림, 번쩍임, 줌 펄스, 흑백
+uniform vec3 u_fx2;    // 레트로, 블러 강도, 클립 시작부터의 시간(초)
 out vec4 outColor;
+
+// 블러: 반경은 프로젝트 기준 픽셀(강도 100% = 40px) → 미리보기·내보내기 해상도가 달라도 같은 모습.
+// 7×7 표본 사이 간격만큼 미리 평균 낸 밉맵 단계에서 읽어, 반경이 커도 겹쳐 보이는 자국이 없다
+vec4 tap(vec2 uv) {
+  if (u_fx2.y <= 0.0) return texture(u_tex, uv);
+  float rpx = u_sharpPx * u_fx2.y * 40.0;
+  vec2 r = u_texel * rpx;
+  float lod = log2(max(rpx / 3.0, 1.0));
+  vec4 acc = vec4(0.0);
+  float ws = 0.0;
+  for (int j = -3; j <= 3; j++) for (int i = -3; i <= 3; i++) {
+    vec2 o = vec2(float(i), float(j)) / 3.0;
+    float w = exp(-dot(o, o) * 2.0);
+    acc += textureLod(u_tex, uv + o * r, lod) * w;
+    ws += w;
+  }
+  return acc / ws;
+}
+
 void main() {
-  vec4 src = texture(u_tex, v_uv);
+  float t = u_fx2.z;
+  vec2 uv = v_uv;
+  // 줌 펄스: 0.5초마다 커졌다 돌아온다 (최대 +12%)
+  float pulse = u_fx1.z * 0.12 * pow(max(0.0, sin(6.2831853 * t * 2.0)), 2.0);
+  // 흔들림: 여러 사인을 섞은 불규칙한 흔들림. 가장자리가 보이지 않게 조금 확대한다
+  vec2 sh = u_fx1.x * 0.03 * vec2(sin(t * 37.0) + 0.5 * sin(t * 71.0 + 1.3), cos(t * 43.0) + 0.5 * sin(t * 59.0 + 0.7));
+  float z = (1.0 + pulse) * (1.0 + u_fx1.x * 0.12);
+  uv = (uv - 0.5) / z + 0.5 + sh / z;
+
+  vec4 src = tap(uv);
   vec3 c = src.rgb;
+  if (u_fx2.x > 0.0) {
+    // 레트로: 빨강·파랑이 살짝 어긋난다
+    float d = 0.004 * u_fx2.x;
+    c.r = mix(c.r, tap(uv + vec2(d, 0.0)).r, 1.0);
+    c.b = mix(c.b, tap(uv - vec2(d, 0.0)).b, 1.0);
+  }
   if (u_sharp > 0.0) {
     vec2 o = u_texel * u_sharpPx;
-    vec3 n = texture(u_tex, v_uv + vec2(o.x, 0.0)).rgb + texture(u_tex, v_uv - vec2(o.x, 0.0)).rgb
-           + texture(u_tex, v_uv + vec2(0.0, o.y)).rgb + texture(u_tex, v_uv - vec2(0.0, o.y)).rgb;
+    vec3 n = texture(u_tex, uv + vec2(o.x, 0.0)).rgb + texture(u_tex, uv - vec2(o.x, 0.0)).rgb
+           + texture(u_tex, uv + vec2(0.0, o.y)).rgb + texture(u_tex, uv - vec2(0.0, o.y)).rgb;
     c = c + (c - n * 0.25) * (u_sharp * 1.5);
   }
   c += u_adj.x * 0.3;
@@ -56,9 +93,20 @@ void main() {
   c = l + (c - l) * (1.0 + u_adj.z);
   c += vec3(0.1, 0.02, -0.1) * u_adj.w;
   c = clamp(c, 0.0, 1.0);
+  // 흑백
+  c = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), u_fx1.w);
+  // 레트로: 누렇게 바랜 색
+  if (u_fx2.x > 0.0) {
+    float g = dot(c, vec3(0.299, 0.587, 0.114));
+    vec3 sepia = clamp(vec3(g * 1.07 + 0.06, g * 0.93 + 0.03, g * 0.72), 0.0, 1.0);
+    c = mix(c, mix(c, sepia, 0.65) * 0.88 + 0.06, u_fx2.x);
+  }
+  // 번쩍임: 시작하자마자, 그리고 약 0.67초마다 하얗게 번쩍
+  float fl = u_fx1.y * pow(max(0.0, cos(6.2831853 * t * 1.5)), 12.0);
+  c = mix(c, vec3(1.0), fl * 0.85);
   if (u_vig > 0.0) {
-    float d = distance(v_uv, vec2(0.5)) * 1.41421356;
-    c *= 1.0 - u_vig * 0.85 * smoothstep(0.35, 1.0, d);
+    float dv = distance(v_uv, vec2(0.5)) * 1.41421356;
+    c *= 1.0 - u_vig * 0.85 * smoothstep(0.35, 1.0, dv);
   }
   outColor = vec4(c * src.a, src.a);
 }`;
@@ -242,7 +290,7 @@ export class GLEffects implements Effects {
       e.preventDefault();
       this.lost = true;
     });
-    this.filterProg = this.program(FS_FILTER, ['u_tex', 'u_texel', 'u_sharpPx', 'u_adj', 'u_sharp', 'u_vig', 'u_flipY']);
+    this.filterProg = this.program(FS_FILTER, ['u_tex', 'u_texel', 'u_sharpPx', 'u_adj', 'u_sharp', 'u_vig', 'u_fx1', 'u_fx2', 'u_flipY']);
     this.blurProg = this.program(FS_BLUR, ['u_tex', 'u_step', 'u_sigma', 'u_flipY']);
     this.transProg = this.program(FS_TRANSITION, ['u_a', 'u_b', 'u_p', 'u_kind', 'u_aspect', 'u_flipY']);
     this.vao = gl.createVertexArray()!;
@@ -329,6 +377,7 @@ export class GLEffects implements Effects {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); // 밉맵 없이 (블러 필터만 켠다)
   }
 
   /** 결과를 캔버스 왼쪽 위 w×h에 그릴 준비 (캔버스는 커지기만 한다) */
@@ -348,7 +397,7 @@ export class GLEffects implements Effects {
     gl.viewport(0, 0, t.w, t.h);
   }
 
-  private drawFilter(tex: WebGLTexture, texW: number, texH: number, a: ColorAdjust, sharpPx: number, flip: boolean, withSharpVig: boolean): void {
+  private drawFilter(tex: WebGLTexture, texW: number, texH: number, a: ColorAdjust, sharpPx: number, flip: boolean, withSharpVig: boolean, fx: EffectParams | null = null): void {
     const gl = this.gl;
     const p = this.filterProg;
     gl.useProgram(p.prog);
@@ -361,6 +410,8 @@ export class GLEffects implements Effects {
     gl.uniform4f(p.u.u_adj, a.brightness / 100, a.contrast / 100, a.saturation / 100, a.temperature / 100);
     gl.uniform1f(p.u.u_sharp, withSharpVig ? a.sharpness / 100 : 0);
     gl.uniform1f(p.u.u_vig, withSharpVig ? a.vignette / 100 : 0);
+    gl.uniform4f(p.u.u_fx1, fx?.shake ?? 0, fx?.flash ?? 0, fx?.zoom ?? 0, fx?.mono ?? 0);
+    gl.uniform3f(p.u.u_fx2, fx?.retro ?? 0, fx?.blur ?? 0, fx?.t ?? 0);
     gl.uniform1f(p.u.u_flipY, flip ? 1 : 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
@@ -379,13 +430,19 @@ export class GLEffects implements Effects {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  filter(image: CanvasImageSource, adjust: ColorAdjust, outW: number, outH: number, pxScale: number): EffectImage | null {
+  filter(image: CanvasImageSource, adjust: ColorAdjust, outW: number, outH: number, pxScale: number, fx: EffectParams | null = null): EffectImage | null {
     if (!this.usable) return null;
     const [w, h] = fitSize(outW, outH);
     this.upload(image, w, h);
+    if (fx && fx.blur > 0) {
+      // 블러 효과: 밉맵으로 넓은 반경을 가볍게 (위 FS_FILTER의 tap)
+      const gl = this.gl;
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    }
     this.toCanvas(w, h);
     // 선명도 반경 = 프로젝트 1픽셀 → 결과 그림에서는 pxScale픽셀 (작은 미리보기에서는 1픽셀보다 작아 약하게 보인다)
-    this.drawFilter(this.srcTex, w, h, adjust, pxScale * (w / Math.max(1, outW)), true, true);
+    this.drawFilter(this.srcTex, w, h, adjust, pxScale * (w / Math.max(1, outW)), true, true, fx);
     return { image: this.canvas, sx: 0, sy: 0, sw: w, sh: h };
   }
 
@@ -430,6 +487,7 @@ export class GLEffects implements Effects {
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img as TexImageSource);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     };
     put(0, this.srcTex, a);
     put(1, this.srcTex2, b);
