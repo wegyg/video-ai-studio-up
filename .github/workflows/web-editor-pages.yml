@@ -67,7 +67,7 @@ jobs:
             echo '```'
             cat playwright-output.txt 2>/dev/null | grep -aE "^(PHONE|LATENCY|AUDIBLE|FILTER_EXPORT|SD_EXPORT|TRANSITION_EXPORT) " || echo "값 없음"
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY""
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 테스트 리포트와 샘플 영상 업로드
         if: always()
