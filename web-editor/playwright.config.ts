@@ -12,17 +12,20 @@ export default defineConfig({
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:4173/',
+    // BASE_URL을 주면 배포된 사이트를 대상으로 같은 테스트를 돌린다 (예: GitHub Pages 주소)
+    baseURL: process.env.BASE_URL ?? 'http://localhost:4173/',
     viewport: { width: 1536, height: 864 }, // Windows 노트북 1920x1080 @125% 배율과 같은 크기
     launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chrome', use: { channel: 'chrome' } }],
-  webServer: {
-    command: 'npm run preview',
-    url: 'http://localhost:4173/',
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+  webServer: process.env.BASE_URL
+    ? undefined
+    : {
+        command: 'npm run preview',
+        url: 'http://localhost:4173/',
+        reuseExistingServer: !process.env.CI,
+        timeout: 60_000,
+      },
 });
