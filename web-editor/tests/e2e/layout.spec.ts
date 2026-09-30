@@ -58,6 +58,14 @@ test('레이아웃: 좌측 탭 4개, 미리보기, 속성, 타임라인(텍스�
   await expect(page.getByTestId('filter-hint')).toContainText('클립을 먼저 고르세요');
 });
 
+test('프로그램 제목과 개발자 표기가 보인다', async ({ page }) => {
+  await expect(page).toHaveTitle(/웹 영상 편집기.*몸의중심 이성진.*1877-7323/);
+  const credit = page.getByTestId('credit');
+  await expect(credit).toBeVisible();
+  await expect(credit).toContainText('개발: 몸의중심 이성진');
+  await expect(credit.getByRole('link')).toHaveAttribute('href', 'tel:1877-7323');
+});
+
 test('비율 전환: 9:16 → 16:9 → 1:1', async ({ page }) => {
   const frame = page.getByTestId('preview-frame');
   const ratio = async () => {

@@ -22,6 +22,12 @@ export const ko = {
     undo: '실행 취소',
     redo: '다시 실행',
   },
+  /** 개발자 표기 (예전 데스크톱 앱과 같은 형식) */
+  credit: {
+    prefix: '개발',
+    name: '몸의중심 이성진',
+    phone: '1877-7323',
+  },
   tabs: {
     label: '자료 탭',
     media: '미디어',

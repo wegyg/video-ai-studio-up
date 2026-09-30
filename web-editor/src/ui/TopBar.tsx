@@ -16,6 +16,13 @@ export function TopBar() {
   return (
     <header className="flex h-11 shrink-0 items-center gap-3 border-b border-neutral-800 bg-neutral-900 px-3">
       <span className="text-sm font-bold text-cyan-400">{ko.app.title}</span>
+      <p data-testid="credit" className="hidden shrink-0 items-center text-[11px] whitespace-nowrap text-neutral-400 md:flex">
+        {ko.credit.prefix}: <span className="ml-1 text-neutral-300">{ko.credit.name}</span>
+        <span className="mx-1.5 text-neutral-600">·</span>
+        <a href={`tel:${ko.credit.phone}`} className="text-cyan-500 hover:underline">
+          {ko.credit.phone}
+        </a>
+      </p>
       <input
         aria-label={ko.topbar.projectName}
         value={name}
